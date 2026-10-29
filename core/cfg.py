@@ -1,0 +1,1 @@
+cfg_file_path = "./core/cfgs/main_cfg.json"
