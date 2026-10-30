@@ -4,3 +4,5 @@ faster_whisper
 sounddevice
 numpy
 vosk
+pyttsx3
+gTTS

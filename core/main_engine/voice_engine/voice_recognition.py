@@ -43,7 +43,7 @@ class LocalVoiceRecognizer:
         else:
             raise ValueError("Supported engines are 'whisper' or 'vosk' only.")
 
-    def transcribe_chunk(self, duration=5):
+    def transcribe_chunk(self, duration: int):
         """
         [Whisper Only] Records a specific chunk of time and returns the recognized text.
         Best for dictation workflows where you talk, stop, and receive punctuation-aware text.
