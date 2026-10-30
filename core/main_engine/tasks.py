@@ -8,7 +8,7 @@ import psutil
 
 class TasksTypes(StrEnum):
   VOICE_RECORD = "voice_record"
-  SPEACK = "speak"
+  SPEAK = "speak"
 
 
 @dataclass(frozen=True) 
