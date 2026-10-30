@@ -1,2 +1,6 @@
 qdrant-client
 pydantic
+faster_whisper
+sounddevice
+numpy
+vosk
