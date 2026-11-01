@@ -8,3 +8,8 @@ pyttsx3
 gTTS
 PyYAML
 psutil
+fastapi
+uvicorn
+httpx
+PySide6
+keyring

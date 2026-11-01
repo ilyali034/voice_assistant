@@ -11,7 +11,7 @@ import webbrowser
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote_plus, urlparse
 from urllib.request import Request, urlopen
@@ -19,12 +19,8 @@ from urllib.request import Request, urlopen
 import psutil
 import yaml
 
+from .assistant_service import ResponseEngine
 from .prompt_manager import PromptManager
-
-
-class ResponseEngine(Protocol):
-    async def handle(self, request: str) -> str:
-        """Handle a user request and return a user-facing result."""
 
 
 class OllamaResponseEngine:
