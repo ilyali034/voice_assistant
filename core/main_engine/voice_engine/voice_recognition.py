@@ -1,10 +1,18 @@
 import queue
 import sys
+from typing import Any
+
 import numpy as np
 import sounddevice as sd
 
+
 class LocalVoiceRecognizer:
-    def __init__(self, engine="whisper", model_size_or_path="base", sample_rate=16000):
+    def __init__(
+        self,
+        engine: str = "whisper",
+        model_size_or_path: str = "base",
+        sample_rate: int = 16000,
+    ) -> None:
         """
         Initialize the local speech recognition engine.
         
@@ -15,13 +23,14 @@ class LocalVoiceRecognizer:
         self.engine = engine.lower()
         self.sample_rate = sample_rate
         self.model_size_or_path = model_size_or_path
-        self._model = None
-        self._recognizer = None
-        self._audio_queue = queue.Queue()
+        self._model: Any | None = None
+        self._recognizer: Any | None = None
+        self.last_detected_language: str | None = None
+        self._audio_queue: queue.Queue[bytes] = queue.Queue()
         
         self._load_model()
 
-    def _load_model(self):
+    def _load_model(self) -> None:
         """Internal method for lazy-loading engines and models."""
         if self.engine == "whisper":
             from faster_whisper import WhisperModel
@@ -43,14 +52,14 @@ class LocalVoiceRecognizer:
         else:
             raise ValueError("Supported engines are 'whisper' or 'vosk' only.")
 
-    def transcribe_chunk(self, duration: int):
+    def transcribe_chunk(self, duration: int) -> str:
         """
         [Whisper Only] Records a specific chunk of time and returns the recognized text.
         Best for dictation workflows where you talk, stop, and receive punctuation-aware text.
         """
-        if self.engine != "whisper":
-            print("[Warning] transcribe_chunk method is optimized for the Whisper engine.")
-            
+        if self.engine != "whisper" or self._model is None:
+            raise RuntimeError("transcribe_chunk requires a loaded Whisper model")
+
         print(f" LISTENING ({duration}s)...")
         audio_data = sd.rec(
             int(duration * self.sample_rate), 
@@ -60,18 +69,36 @@ class LocalVoiceRecognizer:
         )
         sd.wait()
         print(" Processing audio...")
-        
-        segments, info = self._model.transcribe(audio_data.flatten(), beam_size=5)
-        text_result = " ".join([segment.text for segment in segments]).strip()
-        return text_result
 
-    def _audio_callback(self, indata, frames, time, status):
+        return self.transcribe_audio(audio_data.flatten())
+
+    def transcribe_audio(
+        self,
+        audio_data: np.ndarray,
+        *,
+        language: str | None = None,
+        beam_size: int = 5,
+    ) -> str:
+        """Transcribe a prepared mono float audio buffer with the loaded Whisper model."""
+        if self.engine != "whisper" or self._model is None:
+            raise RuntimeError("transcribe_audio requires a loaded Whisper model")
+
+        options: dict[str, Any] = {"beam_size": beam_size}
+        if language:
+            options["language"] = language
+        segments, info = self._model.transcribe(audio_data, **options)
+        self.last_detected_language = info.language
+        return " ".join(segment.text for segment in segments).strip()
+
+    def _audio_callback(self, indata, frames: int, callback_time: Any, status: Any) -> None:
         """Audio stream callback to buffer incoming microphone chunks into a queue."""
+        if frames <= 0:
+            return
         if status:
-            print(status, file=sys.stderr)
+            print(f"{status} at {callback_time.currentTime}", file=sys.stderr)
         self._audio_queue.put(bytes(indata))
 
-    def start_streaming(self, callback_func):
+    def start_streaming(self, callback_func) -> None:
         """
         [Vosk Only] Starts an infinite microphone stream.
         Passes live partial and final text strings to your custom `callback_func`.

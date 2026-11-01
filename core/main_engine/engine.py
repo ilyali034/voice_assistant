@@ -2,6 +2,7 @@
 import asyncio
 from typing import Literal
 
+from .assistant_service import AssistantService
 from .response_engine import ActionEngine, OllamaResponseEngine, ResponseEngine
 from .task_manager import LowLevelTaskManager
 from .vecs.qdrant.qdrant_cfg import QdrantCfg
@@ -18,7 +19,7 @@ class AssistentEngine:
 
     def __init__(
         self,
-        vec_cfg: QdrantCfg,
+        vec_cfg: QdrantCfg | None = None,
         voice_recognizer_engine: str = "whisper",
         voice_assi_mode: str = "online",
         lang: str = "ru",
@@ -32,7 +33,7 @@ class AssistentEngine:
         llm_engine: ResponseEngine | None = None,
         action_engine: ResponseEngine | None = None,
     ) -> None:
-        self.vector_db = VQDBManager(vec_cfg)
+        self.vector_db = VQDBManager(vec_cfg) if vec_cfg is not None else None
         self.assistent_voice = AsyncSpeechEngine(
             mode=voice_assi_mode,
             lang=lang,
@@ -52,8 +53,18 @@ class AssistentEngine:
             "llm": self.llm_engine,
             "actions": action_engine or ActionEngine(),
         }
+        self.service = AssistantService(self.response_engines)
         self.select_mode(assistant_mode)
         self._started = False
+
+    @property
+    def assistant_mode(self) -> str:
+        """Return the selected response mode."""
+        return self.service.assistant_mode
+
+    @assistant_mode.setter
+    def assistant_mode(self, mode: AssistantMode) -> None:
+        self.service.select_mode(mode)
 
     @property
     def available_prompt_presets(self) -> tuple[str, ...]:
@@ -81,16 +92,15 @@ class AssistentEngine:
 
     def select_mode(self, mode: AssistantMode) -> None:
         """Select ``llm`` for generated answers or ``actions`` for direct commands."""
-        if mode not in self.response_engines:
-            raise ValueError(f"Unsupported assistant mode: {mode}")
-        self.assistant_mode = mode
+        self.service.select_mode(mode)
 
     async def start(self) -> None:
         """Initialize persistence and start background workers."""
         if self._started:
             return
 
-        await self.vector_db.init_database()
+        if self.vector_db is not None:
+            await self.vector_db.init_database()
         self.assistent_voice.start()
         await self.task_manager.start()
         self._started = True
@@ -101,7 +111,8 @@ class AssistentEngine:
             await self.task_manager.stop()
             await self.assistent_voice.stop()
             self._started = False
-        await self.vector_db.close()
+        if self.vector_db is not None:
+            await self.vector_db.close()
 
     async def send_request_for_assistent(
         self,
@@ -127,11 +138,7 @@ class AssistentEngine:
         if not request:
             return ""
 
-        response = await self.response_engines[self.assistant_mode].handle(request)
-        if not isinstance(response, str):
-            raise TypeError("The selected response engine must return a string")
-
-        response = response.strip()
+        response = await self.service.handle_request(request)
         if speak and response:
             await self.assistent_voice.say(response)
 
