@@ -6,3 +6,5 @@ numpy
 vosk
 pyttsx3
 gTTS
+PyYAML
+psutil

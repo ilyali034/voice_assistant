@@ -1,0 +1,138 @@
+# Configuration for ActionEngine. Entries in shell.apps and shell.processes
+# are explicit allowlists; edit aliases and commands for this machine.
+web:
+  search_engine: google # google | yandex | duckduckgo | bing
+  sites: {}
+
+shell:
+  timeout_s: 10
+  workdir: ../..
+  audit_log: assistant_audit.log
+  confirm_words: ["подтверждаю", "подтвердить", "выполняй"]
+  # Exact commands only: extra arguments are intentionally rejected.
+  safe_prefixes:
+    - "git status"
+    - "git log"
+    - "git diff"
+    - "git branch"
+    - "pip list"
+    - "pip --version"
+    - "python --version"
+    - "python.exe --version"
+    - "dir"
+    - "ls"
+    - "pwd"
+    - "whoami"
+    - "nvidia-smi"
+    - "ipconfig"
+  blocked_regex:
+    - '\brm\s+-[a-z]*r'
+    - '\b(del|rd|rmdir)\b.*\s/s'
+    - '\bRemove-Item\b.*-Recurse'
+    - '\bformat\s+[a-z]:'
+    - '\b(diskpart|mkfs|bcdedit)\b'
+    - '\bdd\s+if='
+    - '\bshutdown\b'
+    - '\breg\s+(add|delete)\b'
+    - '\bnet\s+user\b'
+    - '(curl|wget|iwr|Invoke-WebRequest).*\|\s*(sh|bash|iex|Invoke-Expression)'
+    - '-enc(odedcommand)?\b'
+    - 'Invoke-Expression|\biex\b'
+    - ':\(\)\s*\{'
+  apps:
+    chrome: "start chrome"
+    browser: "start chrome"
+    edge: "start msedge"
+    firefox: "start firefox"
+    vscode: "code"
+    "vs code": "code"
+    "visual studio code": "code"
+    terminal: "start wt"
+    explorer: "explorer"
+    notepad: "notepad"
+    calculator: "calc"
+    settings: "start ms-settings:"
+    "task manager": "taskmgr"
+    # Create a Start Menu shortcut named TgWsProxy_windows pointing to the EXE.
+    # app: resolves that shortcut without depending on a user's profile/Desktop path.
+    proxy: &tgwsproxy_app "app:TgWsProxy_windows"
+    прокси: *tgwsproxy_app
+    проксу: *tgwsproxy_app
+    "tg ws proxy": *tgwsproxy_app
+    "tg ws прокси": *tgwsproxy_app
+    "tg proxy": *tgwsproxy_app
+    "telegram proxy": *tgwsproxy_app
+    "proxy for telegram": *tgwsproxy_app
+    "прокси telegram": *tgwsproxy_app
+    "прокси для телеграма": *tgwsproxy_app
+    "прокси для телеграмма": *tgwsproxy_app
+    "телеграм прокси": *tgwsproxy_app
+    tgwsproxy: *tgwsproxy_app
+    discord: "app:Discord"
+    telegram: "app:Telegram"
+    telegramm: "app:Telegram"
+    steam: "app:Steam"
+    spotify: "app:Spotify"
+    whatsapp: "app:WhatsApp"
+    viber: "app:Viber"
+    word: "app:Word"
+    excel: "app:Excel"
+    powerpoint: "app:PowerPoint"
+    obs: "app:OBS Studio"
+    хром: "start chrome"
+    "гугл хром": "start chrome"
+    эдж: "start msedge"
+    фаерфокс: "start firefox"
+    "вс код": "code"
+    "визуал студио код": "code"
+    терминал: "start wt"
+    проводник: "explorer"
+    блокнот: "notepad"
+    калькулятор: "calc"
+    "диспетчер задач": "taskmgr"
+    настройки: "start ms-settings:"
+    параметры: "start ms-settings:"
+    дискорд: "app:Discord"
+    телеграм: "app:Telegram"
+    телеграмм: "app:Telegram"
+    стим: "app:Steam"
+    спотифай: "app:Spotify"
+    ватсап: "app:WhatsApp"
+    вайбер: "app:Viber"
+    ворд: "app:Word"
+    эксель: "app:Excel"
+    паверпоинт: "app:PowerPoint"
+    обс: "app:OBS Studio"
+  processes:
+    chrome: chrome.exe
+    browser: chrome.exe
+    "google chrome": chrome.exe
+    edge: msedge.exe
+    firefox: firefox.exe
+    vscode: Code.exe
+    "vs code": Code.exe
+    discord: Discord.exe
+    telegram: Telegram.exe
+    telegramm: Telegram.exe
+    steam: steam.exe
+    spotify: Spotify.exe
+    obs: obs64.exe
+    proxy: TgWsProxy_windows.exe
+    прокси: TgWsProxy_windows.exe
+    проксу: TgWsProxy_windows.exe
+    "tg ws proxy": TgWsProxy_windows.exe
+    "tg ws прокси": TgWsProxy_windows.exe
+    "telegram proxy": TgWsProxy_windows.exe
+    "телеграм прокси": TgWsProxy_windows.exe
+    tgwsproxy: TgWsProxy_windows.exe
+    хром: chrome.exe
+    "гугл хром": chrome.exe
+    эдж: msedge.exe
+    фаерфокс: firefox.exe
+    "вс код": Code.exe
+    дискорд: Discord.exe
+    телеграм: Telegram.exe
+    телеграмм: Telegram.exe
+    стим: steam.exe
+    спотифай: Spotify.exe
+    обс: obs64.exe
