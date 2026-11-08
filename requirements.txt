@@ -13,3 +13,5 @@ uvicorn
 httpx
 PySide6
 keyring
+vosk
+aiosqlite

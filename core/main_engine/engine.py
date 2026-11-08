@@ -5,8 +5,8 @@ from typing import Literal
 from .assistant_service import AssistantService
 from .response_engine import ActionEngine, OllamaResponseEngine, ResponseEngine
 from .task_manager import LowLevelTaskManager
-from .vecs.qdrant.qdrant_cfg import QdrantCfg
-from .vecs.vqdb import VQDBManager
+from .database.qdrant.qdrant_cfg import QdrantCfg
+from .database.db_sql import VQDBManager
 from .voice_engine.assi_voice import AsyncSpeechEngine
 from .voice_engine.voice_recognition import LocalVoiceRecognizer
 
