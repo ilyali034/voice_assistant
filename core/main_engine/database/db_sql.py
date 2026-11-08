@@ -36,19 +36,6 @@ class DBManager:
         ) 
         await self._connection.commit()
 
-    async def save_user_voice(self, msg: str) -> bool: 
-        if msg is not None: 
-            await self._connection.execute(
-                """
-                INSERT INTO messages (msg, role) 
-                VALUES (?, ?)
-                """,
-                (msg, "user")
-            )
-            await self._connection.commit()
-            return True
-        return False
-
     async def save_chat_message(self, msg_id: int | str, text: str, role: str = "user") -> str:
         
         await self._connection.execute(

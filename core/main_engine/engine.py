@@ -4,12 +4,9 @@ from typing import Literal
 
 from .assistant_service import AssistantService
 from .response_engine import ActionEngine, OllamaResponseEngine, ResponseEngine
-from .task_manager import LowLevelTaskManager
-from .database.qdrant.qdrant_cfg import QdrantCfg
-from .database.db_sql import VQDBManager
-from .voice_engine.assi_voice import AsyncSpeechEngine
-from .voice_engine.voice_recognition import LocalVoiceRecognizer
-
+from .database.db_sql import DBManager 
+from .voice_engine.voice import VoiceRecognition, VoiceTTSModule
+from .voice_engine.voice import VoiceRecognition, WakeUpModule
 
 AssistantMode = Literal["llm", "actions"]
 
@@ -19,9 +16,6 @@ class AssistentEngine:
 
     def __init__(
         self,
-        vec_cfg: QdrantCfg | None = None,
-        voice_recognizer_engine: str = "whisper",
-        voice_assi_mode: str = "online",
         lang: str = "ru",
         volume: float = 1.0,
         assistant_mode: AssistantMode = "llm",
@@ -33,14 +27,10 @@ class AssistentEngine:
         llm_engine: ResponseEngine | None = None,
         action_engine: ResponseEngine | None = None,
     ) -> None:
-        self.vector_db = VQDBManager(vec_cfg) if vec_cfg is not None else None
-        self.assistent_voice = AsyncSpeechEngine(
-            mode=voice_assi_mode,
-            lang=lang,
-            volume=volume,
-        )
-        self.voice_recognizer = LocalVoiceRecognizer(engine=voice_recognizer_engine)
-        self.task_manager = LowLevelTaskManager()
+        self.db = DBManager("./core/chat.db")
+        self.voice_r = VoiceRecognition()
+        self.voice_tts = VoiceTTSModule()
+        self.wake_up = WakeUpModule()
         self.llm_engine = llm_engine or OllamaResponseEngine(
             model=llm_model,
             base_url=ollama_url,
@@ -98,48 +88,37 @@ class AssistentEngine:
         """Initialize persistence and start background workers."""
         if self._started:
             return
-
-        if self.vector_db is not None:
-            await self.vector_db.init_database()
-        self.assistent_voice.start()
-        await self.task_manager.start()
-        self._started = True
+        self.db.connect()
+        self.db.init_database() 
 
     async def stop(self) -> None:
         """Stop workers and close the vector database connection."""
         if self._started:
-            await self.task_manager.stop()
             await self.assistent_voice.stop()
             self._started = False
         if self.vector_db is not None:
             await self.vector_db.close()
 
-    async def send_request_for_assistent(
-        self,
-        request: str | None = None,
-        *,
-        duration: int = 5,
-        speak: bool = True,
-    ) -> str:
-        """Get a text or microphone request, generate a reply, and optionally speak it.
+    async def start_assistent(self, wake_word: str = "ассистент") -> None:
 
-        When ``request`` is omitted, audio is recorded and transcribed using the
-        configured recognizer. The selected engine handles the recognized text.
-        """
-        if request is None:
-            if duration <= 0:
-                raise ValueError("duration must be greater than zero")
-            request = await asyncio.to_thread(
-                self.voice_recognizer.transcribe_chunk,
-                duration,
-            )
+        try:
+            while True:
+                detected = await self.wake_up.recognize_wake_up_word(wake_word)
+                if not detected:
+                    return
 
-        request = request.strip()
-        if not request:
-            return ""
+                request = await self.voice_r.start_recognize()
+                if not request:
+                    continue
 
-        response = await self.service.handle_request(request)
-        if speak and response:
-            await self.assistent_voice.say(response)
+                response = await self.service.handle_request(request)
+                await self.voice_tts.say(response) 
 
-        return response
+                try: 
+                    await self.db.save_chat_message(text=request, role="user") 
+                    await self.db.save_chat_message(text=response, role="assistent") 
+                except Exception: 
+                    raise 
+
+        except asyncio.CancelledError:
+            raise
