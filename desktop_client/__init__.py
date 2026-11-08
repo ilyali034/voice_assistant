@@ -1,1 +1,0 @@
-"""Desktop GUI client for Voice Assistant."""
