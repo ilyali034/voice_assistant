@@ -29,7 +29,9 @@ class AssistentEngine:
     ) -> None:
         self.db = DBManager("./core/chat.db")
         self.voice_r = VoiceRecognition()
-        self.voice_tts = VoiceTTSModule()
+        self.voice_tts = VoiceTTSModule(
+                model_path="models/kokoro-v1.0.onnx", 
+                voices_path="models/voices-v1.0.bin")
         self.wake_up = WakeUpModule()
         self.llm_engine = llm_engine or OllamaResponseEngine(
             model=llm_model,
