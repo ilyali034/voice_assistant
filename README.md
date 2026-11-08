@@ -45,12 +45,27 @@ Ready-to-use installers for the desktop application and the server have not yet 
 
 The ActionEngine loads its settings from [assistant.yaml](core/cfgs/assistant.yaml). The following are configured within the YAML file:
 
-- `shell.apps` — specific voice-command names and their corresponding application launch commands. Entries formatted as `app:Name` will search for a shortcut with that name in the Windows Start menu.
-- `shell.processes` — specific aliases for processes that are permitted to be closed. Closing a process requires a separate verbal confirmation and is subject to a 20-second timeout.
-- `shell.safe_prefixes` — a comprehensive list of permitted diagnostic commands. To prevent the addition of potentially dangerous arguments, only exact command matches are allowed; additional parameters are prohibited.
-- `shell.blocked_regex` — an additional list of patterns used for blocking.
-- `web.search_engine` and `web.sites` — the search engine and user-defined website names.
 
 Example commands include: "open VS Code," "launch Telegram," "open the site example.com," "search the internet for the weather," and "close Telegram." To confirm the termination of a process, say one of the phrases listed in `shell.confirm_words`; to cancel, say "cancel."
 
 Commands defined in `shell.safe_prefixes` are executed without a shell (`shell=False`), with an enforced timeout, and are recorded in an audit log. Arbitrary shell commands cannot be executed. Applications will only launch if their corresponding command is defined in `shell.apps`. To use actions via the main controller, create an `AssistentEngine` with `assistant_mode="actions"`. A separate `ActionEngine()` will automatically load the YAML configuration.
+
+## Configuration files
+
+Project configuration files live under `core/cfgs`. `ConfigStore` in
+`core/cfg.py` resolves paths relative to the project rather than the current
+working directory, supports JSON and YAML, and writes changes atomically. A
+missing file can be initialized with defaults:
+
+```python
+from core.cfg import ConfigStore
+
+store = ConfigStore()
+settings = store.load("my_settings.json", {"language": "ru"})
+settings["language"] = "en"
+store.save("my_settings.json", settings)
+```
+
+`main_cfg.json` stores startup preferences; `assistant.yaml` stores the
+ActionEngine allowlists and behavior settings. Invalid or non-mapping config
+files raise a clear `ValueError` rather than silently being ignored.

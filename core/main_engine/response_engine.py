@@ -17,8 +17,8 @@ from urllib.parse import quote_plus, urlparse
 from urllib.request import Request, urlopen
 
 import psutil
-import yaml
 
+from ..cfg import ConfigStore
 from .assistant_service import ResponseEngine
 from .prompt_manager import PromptManager
 
@@ -153,7 +153,7 @@ class RequestRecognizer:
 class ActionEngine:
     """Execute configured desktop, process, shell, and web actions."""
 
-    _default_config_path = Path(__file__).resolve().parents[1] / "cfgs" / "assistant.yaml"
+    _default_config_path = ConfigStore().path("assistant.yaml")
     _search_templates = {
         "google": "https://www.google.com/search?q={query}",
         "yandex": "https://yandex.com/search/?text={query}",
@@ -233,13 +233,7 @@ class ActionEngine:
 
     @staticmethod
     def _load_config(path: Path) -> dict[str, Any]:
-        if not path.exists():
-            return {}
-        with path.open("r", encoding="utf-8") as config_file:
-            data = yaml.safe_load(config_file) or {}
-        if not isinstance(data, dict):
-            raise ValueError(f"Assistant config must contain a YAML mapping: {path}")
-        return data
+        return ConfigStore.load_path(path)
 
     @staticmethod
     def _normalize_mapping(mapping: Any) -> dict[str, str]:
