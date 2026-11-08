@@ -1,73 +1,56 @@
 # Voice Assistant
 
-## Разделение ядра и локальных устройств
+## Decoupling the Core from Local Devices
 
-`AssistantService` в `core/main_engine/assistant_service.py` обрабатывает только
-текстовые запросы и выбирает настроенный response engine. Он не открывает
-микрофон, не запускает TTS и не подключает локальную БД, поэтому его можно
-использовать как основу для backend-процесса.
+The `AssistantService` located in `core/main_engine/assistant_service.py` handles only text-based requests and selects the configured response engine. It does not access the microphone, trigger text-to-speech (TTS), or connect to a local database, making it suitable as a foundation for a backend process.
 
-Существующий `AssistentEngine` остаётся локальной оболочкой: он получает текст
-или записывает речь, вызывает `AssistantService` и при необходимости озвучивает
-ответ. Его текущий конструктор и режимы `llm`/`actions` сохранены.
+The existing `AssistantEngine` remains a local wrapper: it accepts text or records speech, invokes `AssistantService`, and—if necessary—provides an audible response. Its current constructor and `llm`/`actions` modes have been preserved.
 
-Это первый этап архитектурного разделения. HTTP API, удалённый клиент и сборки
-standalone/server будут развиваться отдельно; HTTP API и удалённый response-клиент
-уже доступны как Python-компоненты.
+This represents the first phase of an architectural separation. The HTTP API, remote client, and standalone/server builds will continue to evolve independently; the HTTP API and a remote response client are already available as Python components.
 
-## Backend и удалённый клиент
+## Backend and Remote Client
 
-Backend создаётся через `create_app(service, api_key)` в
-`core/api/app.py`. Он принимает только текстовые запросы, ограниченные 1800
-символами. `GET /health` проверяет доступность, а `POST /v1/requests` требует
-заголовок `Authorization: Bearer <ключ>`. API key обязателен; для обработки
-запросов backend использует только LLM engine и не создаёт микрофон, TTS,
-Qdrant или локальный `ActionEngine`.
+The backend is instantiated via `create_app(service, api_key)` in `core/api/app.py`. It accepts only text-based requests, with a limit of 1,800 characters. The `GET /health` endpoint checks for availability, while `POST /v1/requests` requires an `Authorization: Bearer <key>` header. An API key is mandatory. To process requests, the backend utilizes only the LLM engine; it does not initialize the microphone, TTS, Qdrant, or the local `ActionEngine`.
 
-Для установки только серверных зависимостей используйте
-`requirements-server.txt`; он не устанавливает локальные STT/TTS и Qdrant-пакеты.
-Запуск настроенного backend доступен через `python -m core.api.server`. Перед
-запуском задаются `ASSISTANT_API_KEY` и при необходимости `ASSISTANT_HOST`,
-`ASSISTANT_PORT`, `ASSISTANT_MODEL`, `OLLAMA_BASE_URL`, `OLLAMA_TIMEOUT_S` и
-`ASSISTANT_LANGUAGE`. По умолчанию сервер слушает только `127.0.0.1`. Для
-удалённого подключения задайте `ASSISTANT_HOST=0.0.0.0` и разместите API за
-HTTPS reverse proxy; не выставляйте нешифрованный HTTP backend напрямую в
-интернет. Клиент разрешает обычный HTTP только для localhost.
+To install only the server-side dependencies, use `requirements-server.txt`; this file excludes local STT/TTS and Qdrant packages. A configured backend can be launched by running `python -m core.api.server`. Before
+launch, you must set `ASSISTANT_API_KEY` and, if necessary, `ASSISTANT_HOST`,
+`ASSISTANT_PORT`, `ASSISTANT_MODEL`, `OLLAMA_BASE_URL`, `OLLAMA_TIMEOUT_S`, and
+`ASSISTANT_LANGUAGE`. By default, the server listens only on `127.0.0.1`. For
+remote access, set `ASSISTANT_HOST=0.0.0.0` and place the API behind an
+HTTPS reverse proxy; do not expose an unencrypted HTTP backend directly to the
+internet. The client allows plain HTTP only for localhost.
 
-На ноутбуке `RemoteResponseEngine` из
-`core/main_engine/remote_client.py` реализует тот же интерфейс, что и локальный
-LLM. Его можно передать в `AssistentEngine` через `llm_engine`; микрофон, TTS и
-`ActionEngine` останутся локальными. Передача аудио backend пока не поддержана.
-GUI-клиент находится в отдельном пакете `desktop_client` и запускается через
-`python -m desktop_client`. В настройках можно переключать LLM между локальным
-Ollama и удалённым backend; режим «Команды» всегда выполняется локально на
-ноутбуке. Предпочтения хранятся через QSettings, API key — в системном
-хранилище учётных данных, а не в файле настроек.
+On the laptop, `RemoteResponseEngine` from
+`core/main_engine/remote_client.py` implements the same interface as the local
+LLM. It can be passed to `AssistentEngine` via the `llm_engine` parameter; the
+microphone, TTS, and `ActionEngine` remain local. Audio backend streaming is
+not currently supported. The GUI client is located in a separate package,
+`desktop_client`, and can be launched using `python -m desktop_client`. In the
+settings, you can switch the LLM between a local Ollama instance and a remote
+backend; "Command" mode is always executed locally on the laptop. Preferences
+are stored via `QSettings`, while the API key is kept in the system's
+credential store rather than in a configuration file.
 
-Голосовой ввод запускается кнопкой «Голос» или клавишей F9, когда окно клиента
-активно. Запись обрабатывается локально Whisper-моделью `base` и завершается
-после 0.8 секунды тишины, по повторному нажатию или через 15 секунд; если речь
-не начинается в течение 3 секунд, запись отменяется. При первом включении
-микрофона Whisper-модель может быть загружена из сети. Ответы озвучиваются
-локальным TTS через pyttsx3; озвучивание можно отключить флажком. Сетевой backend
-получает только распознанный текст. Глобальный hotkey, wake word и установщик
-desktop-приложения пока не реализованы.
+Voice input is triggered by the "Voice" button or the F9 key when the client
+window is active. The recording is processed locally using the `base` Whisper
+model and stops after 0.8 seconds of silence, upon a second press of the
+trigger, or after 15 seconds; if speech does not begin within 3 seconds, the
+recording is canceled. When the microphone is enabled for the first time, the
+Whisper model may be downloaded from the network. Responses are voiced via a local TTS engine using `pyttsx3`; this feature can be disabled via a checkbox. The network backend receives only the transcribed text. A global hotkey, wake word, and a desktop application installer have not yet been implemented.
 
-Standalone-режим использует локальный `OllamaResponseEngine` по умолчанию.
-Готовые установщики desktop-приложения и сервера пока не собраны.
+Standalone mode uses a local `OllamaResponseEngine` by default.
+Ready-to-use installers for the desktop application and the server have not yet been built.
 
-## Конфигурация ActionEngine
+## ActionEngine Configuration
 
-Движок действий загружает настройки из [assistant.yaml](core/cfgs/assistant.yaml). В YAML настраиваются:
+The ActionEngine loads its settings from [assistant.yaml](core/cfgs/assistant.yaml). The following are configured within the YAML file:
 
-- `shell.apps` — точные голосовые названия и команды запуска приложений. Значения `app:Имя` ищут ярлык с таким именем в меню «Пуск» Windows.
-- `shell.processes` — точные псевдонимы процессов, которые разрешено закрывать. Закрытие требует отдельного голосового подтверждения и ограничено 20 секундами.
-- `shell.safe_prefixes` — полный список разрешённых диагностических команд. Для защиты от добавления опасных аргументов допускается только точное совпадение команды; дополнительные параметры запрещены.
-- `shell.blocked_regex` — дополнительный список блокирующих шаблонов.
-- `web.search_engine` и `web.sites` — поисковик и пользовательские имена сайтов.
+- `shell.apps` — specific voice-command names and their corresponding application launch commands. Entries formatted as `app:Name` will search for a shortcut with that name in the Windows Start menu.
+- `shell.processes` — specific aliases for processes that are permitted to be closed. Closing a process requires a separate verbal confirmation and is subject to a 20-second timeout.
+- `shell.safe_prefixes` — a comprehensive list of permitted diagnostic commands. To prevent the addition of potentially dangerous arguments, only exact command matches are allowed; additional parameters are prohibited.
+- `shell.blocked_regex` — an additional list of patterns used for blocking.
+- `web.search_engine` and `web.sites` — the search engine and user-defined website names.
 
-Примеры команд: «открой VS Code», «запусти телеграм», «открой сайт example.com», «найди в интернете погоду» и «закрой Telegram». Для подтверждения завершения процесса скажите одну из фраз в `shell.confirm_words`; отмена — «отмена».
+Example commands include: "open VS Code," "launch Telegram," "open the site example.com," "search the internet for the weather," and "close Telegram." To confirm the termination of a process, say one of the phrases listed in `shell.confirm_words`; to cancel, say "cancel."
 
-Команды из `shell.safe_prefixes` запускаются без оболочки (`shell=False`), с таймаутом и записью в audit log. Произвольные shell-команды не выполняются. Приложения запускаются только если их команда задана в `shell.apps`.
-
-Чтобы использовать actions через основной контроллер, создайте `AssistentEngine` с `assistant_mode="actions"`. Отдельный `ActionEngine()` автоматически загрузит YAML-конфигурацию.
+Commands defined in `shell.safe_prefixes` are executed without a shell (`shell=False`), with an enforced timeout, and are recorded in an audit log. Arbitrary shell commands cannot be executed. Applications will only launch if their corresponding command is defined in `shell.apps`. To use actions via the main controller, create an `AssistentEngine` with `assistant_mode="actions"`. A separate `ActionEngine()` will automatically load the YAML configuration.
