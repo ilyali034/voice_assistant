@@ -1,12 +1,12 @@
 
 import asyncio
+from pathlib import Path
 from typing import Literal
 
 from .assistant_service import AssistantService
 from .response_engine import ActionEngine, OllamaResponseEngine, ResponseEngine
-from .database.db_sql import DBManager 
-from .voice_engine.voice import VoiceRecognition, VoiceTTSModule
-from .voice_engine.voice import VoiceRecognition, WakeUpModule
+from .database.db_sql import DBManager
+from .voice_engine.voice import VoiceRecognition, VoiceTTSModule, WakeUpModule
 
 AssistantMode = Literal["llm", "actions"]
 
@@ -27,12 +27,10 @@ class AssistentEngine:
         llm_engine: ResponseEngine | None = None,
         action_engine: ResponseEngine | None = None,
     ) -> None:
-        self.db = DBManager("./core/chat.db")
+        self.db = DBManager(Path(__file__).resolve().parents[1] / "chat.db")
         self.voice_r = VoiceRecognition()
-        self.voice_tts = VoiceTTSModule(
-                model_path="models/kokoro-v1.0.onnx", 
-                voices_path="models/voices-v1.0.bin")
-        self.wake_up = WakeUpModule()
+        self.voice_tts = VoiceTTSModule(lang=lang, volume=volume)
+        self.wake_up = WakeUpModule(model=self.voice_r.model)
         self.llm_engine = llm_engine or OllamaResponseEngine(
             model=llm_model,
             base_url=ollama_url,
@@ -87,21 +85,26 @@ class AssistentEngine:
         self.service.select_mode(mode)
 
     async def start(self) -> None:
-        """Initialize persistence and start background workers."""
+        """Initialize local persistence before accepting assistant requests."""
         if self._started:
             return
-        self.db.connect()
-        self.db.init_database() 
+        try:
+            await self.db.connect()
+            await self.db.init_database()
+        except Exception:
+            await self.db.disconnect()
+            raise
+        self._started = True
 
     async def stop(self) -> None:
-        """Stop workers and close the vector database connection."""
+        """Close local persistence resources."""
         if self._started:
-            await self.assistent_voice.stop()
+            await self.db.disconnect()
             self._started = False
-        if self.vector_db is not None:
-            await self.vector_db.close()
 
     async def start_assistent(self, wake_word: str = "ассистент") -> None:
+        if not self._started:
+            await self.start()
 
         try:
             while True:
@@ -114,13 +117,9 @@ class AssistentEngine:
                     continue
 
                 response = await self.service.handle_request(request)
-                await self.voice_tts.say(response) 
-
-                try: 
-                    await self.db.save_chat_message(text=request, role="user") 
-                    await self.db.save_chat_message(text=response, role="assistent") 
-                except Exception: 
-                    raise 
+                await self.voice_tts.say(response)
+                await self.db.save_chat_message(text=request, role="user")
+                await self.db.save_chat_message(text=response, role="assistant")
 
         except asyncio.CancelledError:
             raise

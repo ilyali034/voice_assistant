@@ -24,22 +24,28 @@ On the laptop, `RemoteResponseEngine` from
 `core/main_engine/remote_client.py` implements the same interface as the local
 LLM. It can be passed to `AssistentEngine` via the `llm_engine` parameter; the
 microphone, TTS, and `ActionEngine` remain local. Audio backend streaming is
-not currently supported. The GUI client is located in a separate package,
-`desktop_client`, and can be launched using `python -m desktop_client`. In the
-settings, you can switch the LLM between a local Ollama instance and a remote
-backend; "Command" mode is always executed locally on the laptop. Preferences
-are stored via `QSettings`, while the API key is kept in the system's
-credential store rather than in a configuration file.
+not currently supported.
 
-Voice input is triggered by the "Voice" button or the F9 key when the client
-window is active. The recording is processed locally using the `base` Whisper
-model and stops after 0.8 seconds of silence, upon a second press of the
-trigger, or after 15 seconds; if speech does not begin within 3 seconds, the
-recording is canceled. When the microphone is enabled for the first time, the
-Whisper model may be downloaded from the network. Responses are voiced via a local TTS engine using `pyttsx3`; this feature can be disabled via a checkbox. The network backend receives only the transcribed text. A global hotkey, wake word, and a desktop application installer have not yet been implemented.
+## Run the local voice assistant on Windows
 
-Standalone mode uses a local `OllamaResponseEngine` by default.
-Ready-to-use installers for the desktop application and the server have not yet been built.
+From the project root, install the dependencies and start the assistant:
+
+```powershell
+.\voice_venv\Scripts\python.exe -m pip install -r requirements.txt
+.\voice_venv\Scripts\python.exe -m core
+```
+
+The bundled Vosk Russian model is used for microphone input. Speech output uses
+an installed Windows voice matching `--lang` (for Russian, Microsoft Irina is
+used when available). Connect a microphone and speakers/headphones before
+launching. The default `actions` mode runs local allowlisted desktop actions
+without Ollama. For generated answers, start Ollama with the `llama3.2` model
+available and run `.\voice_venv\Scripts\python.exe -m core --mode llm`.
+Use `.\voice_venv\Scripts\python.exe -m core --help` to see options such as
+language, model, and wake word. Press Ctrl+C to stop the assistant.
+
+This repository currently provides a console runner, not a desktop GUI package
+or a ready-to-use installer.
 
 ## ActionEngine Configuration
 

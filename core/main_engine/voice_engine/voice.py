@@ -3,22 +3,30 @@ import json
 import sounddevice as sd
 from pathlib import Path
 from vosk import Model, KaldiRecognizer
-from kokoro_onnx import KokoroOnnx
-import numpy as np 
-import urllib.request
-import sys
+import pyttsx3
 
-class VoiceRecognition: 
-    def __init__(self, model_path: str = "./model", samplerate: int = 16000 ):
-        BASE_DIR = Path(__file__).resolve().parent
-        model_path = BASE_DIR / "model" / "vosk-model-small-ru-0.22"
+DEFAULT_VOSK_MODEL_PATH = (
+    Path(__file__).resolve().parent / "model" / "vosk-model-small-ru-0.22"
+)
 
-        self.model = Model(str(model_path))
+
+def _load_vosk_model(model_path: str | Path | None) -> Model:
+    resolved_path = Path(model_path) if model_path is not None else DEFAULT_VOSK_MODEL_PATH
+    if not resolved_path.is_absolute():
+        resolved_path = Path(__file__).resolve().parent / resolved_path
+    if not resolved_path.is_dir():
+        raise FileNotFoundError(f"Vosk model directory not found: {resolved_path}")
+    return Model(str(resolved_path))
+
+
+class VoiceRecognition:
+    def __init__(self, model_path: str | Path | None = None, samplerate: int = 16000 ):
+        self.model = _load_vosk_model(model_path)
         self.samplerate = samplerate
         self.audio_queue = asyncio.Queue()
         self.loop = None
 
-    def _audio_callback(self, indata, frames, time, status):
+    def _audio_callback(self, indata, _frames, _time, status):
         if status:
             print(f"Статус аудио: {status}")
         if self.loop and not self.loop.is_closed():
@@ -63,16 +71,19 @@ class VoiceRecognition:
 
 
 class WakeUpModule: 
-    def __init__(self, model_path: str = "./model", samplerate: int = 16000):
-        BASE_DIR = Path(__file__).resolve().parent
-        resolved_model_path = BASE_DIR / "model" / "vosk-model-small-ru-0.22"
-
-        self.model = Model(str(resolved_model_path))
+    def __init__(
+        self,
+        model_path: str | Path | None = None,
+        samplerate: int = 16000,
+        *,
+        model: Model | None = None,
+    ):
+        self.model = model if model is not None else _load_vosk_model(model_path)
         self.samplerate = samplerate
         self.audio_queue = asyncio.Queue()
         self.loop = None 
 
-    def _audio_callback(self, indata, frames, time, status):
+    def _audio_callback(self, indata, _frames, _time, status):
         if status:
             print(f"Статус аудио: {status}", flush=True)
         if self.loop and not self.loop.is_closed():
@@ -118,82 +129,53 @@ class WakeUpModule:
                 return False 
 
 
-class VoiceTTSModule: 
-    def __init__(self, model_filename: str = "kokoro-v1.0.onnx", voices_filename: str = "voices-v1.0.bin"):
-        BASE_DIR = Path(__file__).resolve().parent
-        self.model_dir = BASE_DIR / "model"
-        self.model_dir.mkdir(parents=True, exist_ok=True)
+class VoiceTTSModule:
+    """Speak responses through an installed operating-system voice."""
 
-        self.model_path = self.model_dir / model_filename
-        self.voices_path = self.model_dir / voices_filename
+    def __init__(self, lang: str = "ru", volume: float = 1.0) -> None:
+        self.lang = lang.casefold().replace("_", "-")
+        self.volume = max(0.0, min(1.0, volume))
 
-        self.urls = {
-            self.model_path: "https://huggingface.co",
-            self.voices_path: "https://github.com"
-        }
+    async def say(self, text: str, voice: str | None = None) -> None:
+        if text and text.strip():
+            await asyncio.to_thread(self._say_sync, text.strip(), voice)
 
-        self._ensure_models_exist()
+    def _say_sync(self, text: str, preferred_voice: str | None) -> None:
+        engine = pyttsx3.init()
+        try:
+            voices = engine.getProperty("voices") or []
+            selected_voice = None
 
-        self.onnx = KokoroOnnx(str(self.model_path), str(self.voices_path)) 
-        self.sample_rate = 24000 
+            if preferred_voice:
+                preferred = preferred_voice.casefold()
+                selected_voice = next(
+                    (
+                        item
+                        for item in voices
+                        if preferred in item.id.casefold()
+                        or preferred in item.name.casefold()
+                    ),
+                    None,
+                )
 
-    def _progress_callback(self, block_num, block_size, total_size):
-        downloaded = block_num * block_size
-        if total_size > 0:
-            percent = min(int(downloaded * 100 / total_size), 100)
-            sys.stdout.write(f"\rЗагрузка: [{'*' * (percent // 2)}{' ' * (50 - percent // 2)}] {percent}%")
-            sys.stdout.flush()
+            language = self.lang.split("-", maxsplit=1)[0]
+            if selected_voice is None:
+                selected_voice = next(
+                    (
+                        item
+                        for item in voices
+                        if any(
+                            str(code).casefold().replace("_", "-").startswith(language)
+                            for code in getattr(item, "languages", [])
+                        )
+                    ),
+                    None,
+                )
 
-    def _ensure_models_exist(self):
-        for file_path, url in self.urls.items():
-            if not file_path.exists():
-                print(f"\nФайл {file_path.name} не найден. Начинаю скачивание...")
-                try:
-                    urllib.request.urlretrieve(url, file_path, self._progress_callback)
-                    print(f"\nФайл {file_path.name} успешно загружен!")
-                except Exception as e:
-                    if file_path.exists():
-                        file_path.unlink()
-                    print(f"\nОшибка при скачивании {file_path.name}: {e}")
-                    raise e
-
-    async def say(self, text: str, voice: str = "ru_alex") -> None: 
-        if not text or not text.strip():
-            return 
-
-        audio_queue = asyncio.Queue() 
-
-        def audio_callback(outdata, frames, time, status): 
-            if status: 
-                print(f"Audio status: {status}") 
-            try: 
-                data = audio_queue.get_nowait() 
-                if len(data) < len(outdata):
-                    outdata[:len(data)] = data
-                    outdata[len(data):].fill(0)
-                    raise sd.CallbackStop
-                else:
-                    outdata[:] = data[:len(outdata)]
-            except asyncio.QueueEmpty:
-                outdata.fill(0)  
-
-        async_gen = self.onnx.create_stream(text, voice=voice, speed=1.0, lang="z") 
-
-        stream = sd.OutputStream(
-            samplerate=self.sample_rate, 
-            channels=1, 
-            dtype='float32', 
-            callback=audio_callback
-        )
-
-        with stream:
-            try:
-                async for samples, _ in async_gen:
-                    samples_data = np.array(samples, dtype=np.float32).reshape(-1, 1)
-                    await audio_queue.put(samples_data)
-                    
-                while not audio_queue.empty():
-                    await asyncio.sleep(0.05)
-                    
-            except Exception as e:
-                print(f"\nОшибка при генерации/воспроизведении речи: {e}")
+            if selected_voice is not None:
+                engine.setProperty("voice", selected_voice.id)
+            engine.setProperty("volume", self.volume)
+            engine.say(text)
+            engine.runAndWait()
+        finally:
+            engine.stop()
