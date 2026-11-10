@@ -32,36 +32,30 @@ class OllamaResponseEngine:
         self.search_engine = LangchainOllamaSearchEngine()
 
     async def handle(self, request: str, web_search: bool) -> str:
-        if web_search is False: 
-            body = json.dumps(
-                {
-                    "model": self.model,
-                    "stream": False,
-                    "messages": [
-                        {
-                            "role": "system",
-                            "content": self.prompt_manager.system_prompt,
-                        },
-                        {"role": "user", "content": request},
-                    ],
-                }
-            ).encode("utf-8") 
+        user_content = request
 
-        else: 
+        if web_search:
             eth_context = await self.search_engine.standart_search(request=request)
-            body = json.dumps(
-                {
-                    "model": self.model,
-                    "stream": False,
-                    "messages": [
-                        {
-                            "role": "system",
-                            "content": self.prompt_manager.system_prompt,
-                        },
-                        {"role": "user", "content": request +  f"контекст из интернета: \n {eth_context}"},
-                    ],
-                }
-            ).encode("utf-8")
+            user_content = (
+                f"<context>\n{eth_context}\n</context>\n\n"
+                f"Используя приведенный выше контекст из интернета, "
+                f"ответь на вопрос: {request}"
+            )
+
+        body = json.dumps(
+            {
+                "model": self.model,
+                "stream": False,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": self.prompt_manager.system_prompt,
+                    },
+                    {"role": "user", "content": user_content},
+                ],
+            }
+        ).encode("utf-8")
+
         ollama_request = Request(
             f"{self.base_url}/api/chat",
             data=body,
@@ -87,7 +81,7 @@ class OllamaResponseEngine:
         if not isinstance(text, str) or not text.strip():
             raise RuntimeError("Ollama returned an empty or invalid chat response.")
         return text.strip()
-
+    
     def _post(self, request: Request) -> dict[str, Any]:
         with urlopen(request, timeout=self.timeout) as response:
             data = json.loads(response.read().decode("utf-8"))
