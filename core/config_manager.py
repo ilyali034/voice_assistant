@@ -68,3 +68,13 @@ class AssistantConfigLoader:
 def load_assistant_config(config_dir: str | Path = CONFIG_DIR) -> dict[str, Any]:
     """Convenience function for loading the default assistant config tree."""
     return AssistantConfigLoader(config_dir).load()
+
+
+def get_search_engine() -> str:
+    """Return the configured web search engine, defaulting to Google."""
+    if CONFIG_DIR is None: 
+        raise Exception("Config is not defined")
+    web_config = load_assistant_config(CONFIG_DIR).get("web", {})
+    if not isinstance(web_config, Mapping):
+        return "google"
+    return str(web_config.get("search_engine", "google")).casefold()

@@ -14,3 +14,4 @@ httpx
 PySide6
 keyring
 aiosqlite
+langchain_community

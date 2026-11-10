@@ -4,7 +4,8 @@ from pathlib import Path
 from typing import Literal
 
 from .assistant_service import AssistantService
-from .response_engine import ActionEngine, OllamaResponseEngine, ResponseEngine
+from .response_engine import ActionEngine, ResponseEngine
+from .llm.ollama_engine import OllamaResponseEngine
 from .database.db_sql import DBManager
 from .voice_engine.voice import VoiceRecognition, VoiceTTSModule, WakeUpModule
 
