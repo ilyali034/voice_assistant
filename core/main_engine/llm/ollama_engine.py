@@ -51,7 +51,7 @@ class OllamaResponseEngine:
                 f"Could not pull Ollama model '{self.model}': {details or 'unknown error'}"
             )
 
-    async def handle(self, request: str, web_search: bool = False) -> str:
+    async def handle(self, request: str, web_search: bool = True) -> str:
         user_content = request
 
         if web_search:
