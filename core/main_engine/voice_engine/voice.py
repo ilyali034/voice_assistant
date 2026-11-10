@@ -1,5 +1,8 @@
 import asyncio
 import json
+import sys
+import threading
+import time
 import sounddevice as sd
 from pathlib import Path
 from vosk import Model, KaldiRecognizer
@@ -55,7 +58,8 @@ class VoiceRecognition:
                         result = json.loads(rec.Result())
                         text_res = result.get('text', '').strip()
                         if text_res:
-                            return text_res  # Исправлено: возвращаем распознанную строку
+                            print(f"\nРаспознано: {text_res}")
+                            return text_res
 
                     else:
                         partial = json.loads(rec.PartialResult())
@@ -130,18 +134,63 @@ class WakeUpModule:
 
 
 class VoiceTTSModule:
-    """Speak responses through an installed operating-system voice."""
+    """Speak responses through an installed OS voice, interruptible with Esc."""
 
     def __init__(self, lang: str = "ru", volume: float = 1.0) -> None:
         self.lang = lang.casefold().replace("_", "-")
         self.volume = max(0.0, min(1.0, volume))
 
     async def say(self, text: str, voice: str | None = None) -> None:
-        if text and text.strip():
-            await asyncio.to_thread(self._say_sync, text.strip(), voice)
+        if not text or not text.strip():
+            return
 
-    def _say_sync(self, text: str, preferred_voice: str | None) -> None:
+        stop_requested = threading.Event()
+        playback_finished = threading.Event()
+        playback = asyncio.create_task(
+            asyncio.to_thread(
+                self._say_sync,
+                text.strip(),
+                voice,
+                stop_requested,
+            )
+        )
+        interrupt_listener = asyncio.create_task(
+            asyncio.to_thread(
+                self._wait_for_escape,
+                stop_requested,
+                playback_finished,
+            )
+        )
+        try:
+            await playback
+        finally:
+            playback_finished.set()
+            await interrupt_listener
+
+    @staticmethod
+    def _wait_for_escape(
+        stop_requested: threading.Event,
+        playback_finished: threading.Event,
+    ) -> None:
+        if sys.platform != "win32" or not sys.stdin.isatty():
+            return
+
+        import msvcrt
+
+        while not playback_finished.wait(0.05):
+            if msvcrt.kbhit() and msvcrt.getwch() == "\x1b":
+                stop_requested.set()
+                print("\nОтвет прерван.")
+                return
+
+    def _say_sync(
+        self,
+        text: str,
+        preferred_voice: str | None,
+        stop_requested: threading.Event,
+    ) -> None:
         engine = pyttsx3.init()
+        loop_started = False
         try:
             voices = engine.getProperty("voices") or []
             selected_voice = None
@@ -176,6 +225,15 @@ class VoiceTTSModule:
                 engine.setProperty("voice", selected_voice.id)
             engine.setProperty("volume", self.volume)
             engine.say(text)
-            engine.runAndWait()
+            engine.startLoop(False)
+            loop_started = True
+            while engine.isBusy():
+                if stop_requested.is_set():
+                    engine.stop()
+                    break
+                engine.iterate()
+                time.sleep(0.01)
         finally:
+            if loop_started:
+                engine.endLoop()
             engine.stop()

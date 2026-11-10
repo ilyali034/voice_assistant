@@ -1,0 +1,3 @@
+web:
+  search_engine: google # google | yandex | duckduckgo | bing
+  sites: {}

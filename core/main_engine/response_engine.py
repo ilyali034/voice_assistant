@@ -18,7 +18,8 @@ from urllib.request import Request, urlopen
 
 import psutil
 
-from ..cfg import ConfigStore
+from ..cfg import CONFIG_DIR, ConfigStore
+from ..config_manager import load_assistant_config
 from .assistant_service import ResponseEngine
 from .prompt_manager import PromptManager
 
@@ -153,7 +154,7 @@ class RequestRecognizer:
 class ActionEngine:
     """Execute configured desktop, process, shell, and web actions."""
 
-    _default_config_path = ConfigStore().path("assistant.yaml")
+    _default_config_path = CONFIG_DIR / "assistant.yaml"
     _search_templates = {
         "google": "https://www.google.com/search?q={query}",
         "yandex": "https://yandex.com/search/?text={query}",
@@ -168,7 +169,12 @@ class ActionEngine:
         config_path: str | Path | None = None,
     ) -> None:
         self.config_path = Path(config_path) if config_path else self._default_config_path
-        self.config = config if config is not None else self._load_config(self.config_path)
+        if config is not None:
+            self.config = config
+        elif config_path is None:
+            self.config = load_assistant_config()
+        else:
+            self.config = self._load_config(self.config_path)
         self.shell_config = self.config.get("shell", {})
         self.apps = self._normalize_mapping(self.shell_config.get("apps", {}))
         self.processes = self._normalize_mapping(self.shell_config.get("processes", {}))
@@ -184,6 +190,9 @@ class ActionEngine:
             RequestRecognizer.normalize(str(word))
             for word in self.shell_config.get("confirm_words", ("подтверждаю",))
         }
+        self.confirm_process_close = bool(
+            self.shell_config.get("confirm_process_close", False)
+        )
         self.cancel_words = {"отмена", "отмени", "cancel"}
         self._pending_process_close: tuple[str, float] | None = None
         self.recognizer = RequestRecognizer()
@@ -252,6 +261,19 @@ class ActionEngine:
     ) -> None:
         """Register additional command patterns and their async action handler."""
         self.recognizer.register_action(patterns, handler)
+
+    @property
+    def awaiting_confirmation(self) -> bool:
+        """Return whether a process-close confirmation is still valid."""
+        pending = self._pending_process_close
+        return pending is not None and time.monotonic() <= pending[1]
+
+    def can_handle(self, request: str) -> bool:
+        """Check whether this request is an action or a pending confirmation."""
+        return (
+            self.awaiting_confirmation
+            or self.recognizer.recognize(request) is not None
+        )
 
     async def handle(self, request: str) -> str:
         command = RequestRecognizer.normalize(request)
@@ -381,11 +403,14 @@ class ActionEngine:
         alias = RequestRecognizer.normalize(match.group("target"))
         if alias not in self.processes:
             return f"Процесс «{alias}» отсутствует в разрешённом списке."
-        self._pending_process_close = (alias, time.monotonic() + 20)
-        return (
-            f"Закрыть процесс «{alias}»? Скажите «подтверждаю» в течение 20 секунд "
-            "или «отмена»."
-        )
+        if self.confirm_process_close:
+            self._pending_process_close = (alias, time.monotonic() + 20)
+            return (
+                f"Закрыть процесс «{alias}»? Скажите «подтверждаю» в течение 20 секунд "
+                "или «отмена»."
+            )
+        self._pending_process_close = None
+        return await self._terminate_configured_processes(alias)
 
     async def _terminate_configured_processes(self, alias: str) -> str:
         process_name = self.processes[alias].casefold()

@@ -1,0 +1,36 @@
+shell:
+  timeout_s: 10
+  workdir: ../..
+  audit_log: assistant_audit.log
+  confirm_process_close: false
+  confirm_words: ["подтверждаю", "подтвердить", "выполняй"]
+  # Exact commands only: extra arguments are intentionally rejected.
+  safe_prefixes:
+    - "git status"
+    - "git log"
+    - "git diff"
+    - "git branch"
+    - "pip list"
+    - "pip --version"
+    - "python --version"
+    - "python.exe --version"
+    - "dir"
+    - "ls"
+    - "pwd"
+    - "whoami"
+    - "nvidia-smi"
+    - "ipconfig"
+  blocked_regex:
+    - '\brm\s+-[a-z]*r'
+    - '\b(del|rd|rmdir)\b.*\s/s'
+    - '\bRemove-Item\b.*-Recurse'
+    - '\bformat\s+[a-z]:'
+    - '\b(diskpart|mkfs|bcdedit)\b'
+    - '\bdd\s+if='
+    - '\bshutdown\b'
+    - '\breg\s+(add|delete)\b'
+    - '\bnet\s+user\b'
+    - '(curl|wget|iwr|Invoke-WebRequest).*\|\s*(sh|bash|iex|Invoke-Expression)'
+    - '-enc(odedcommand)?\b'
+    - 'Invoke-Expression|\biex\b'
+    - ':\(\)\s*\{'

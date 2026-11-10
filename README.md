@@ -4,7 +4,7 @@
 
 The `AssistantService` located in `core/main_engine/assistant_service.py` handles only text-based requests and selects the configured response engine. It does not access the microphone, trigger text-to-speech (TTS), or connect to a local database, making it suitable as a foundation for a backend process.
 
-The existing `AssistantEngine` remains a local wrapper: it accepts text or records speech, invokes `AssistantService`, and—if necessary—provides an audible response. Its current constructor and `llm`/`actions` modes have been preserved.
+The existing `AssistantEngine` remains a local wrapper: it accepts text or records speech, invokes `AssistantService`, and—if necessary—provides an audible response. It supports `hybrid`, `llm`, and `actions` modes.
 
 This represents the first phase of an architectural separation. The HTTP API, remote client, and standalone/server builds will continue to evolve independently; the HTTP API and a remote response client are already available as Python components.
 
@@ -38,23 +38,41 @@ From the project root, install the dependencies and start the assistant:
 The bundled Vosk Russian model is used for microphone input. Speech output uses
 an installed Windows voice matching `--lang` (for Russian, Microsoft Irina is
 used when available). Connect a microphone and speakers/headphones before
-launching. The default `actions` mode runs local allowlisted desktop actions
-without Ollama. For generated answers, start Ollama with the `llama3.2` model
-available and run `.\voice_venv\Scripts\python.exe -m core --mode llm`.
-Use `.\voice_venv\Scripts\python.exe -m core --help` to see options such as
-language, model, and wake word. Press Ctrl+C to stop the assistant.
+launching. The default `hybrid` mode runs recognized desktop commands through
+the local allowlist and sends other questions to Ollama. Start Ollama with the
+`llama3.2` model available before asking general questions. Use
+`.\voice_venv\Scripts\python.exe -m core --mode llm` for LLM-only mode or
+`.\voice_venv\Scripts\python.exe -m core --mode actions` for offline actions
+only. Press Esc during spoken output to interrupt the answer; press Ctrl+C to
+exit. Use `.\voice_venv\Scripts\python.exe -m core --help` for all options.
 
 This repository currently provides a console runner, not a desktop GUI package
 or a ready-to-use installer.
 
 ## ActionEngine Configuration
 
-The ActionEngine loads its settings from [assistant.yaml](core/cfgs/assistant.yaml). The following are configured within the YAML file:
+The ActionEngine configuration is split into focused YAML modules under
+[core/cfgs/assistant](core/cfgs/assistant): `web.yaml` configures search and
+site aliases, `shell.yaml` holds shell-command safety and behavior, and
+`apps.yaml` / `processes.yaml` contain the application and process allowlists.
+This keeps per-machine aliases separate from general behavior settings.
 
+Users can add overrides without editing the built-in modules: create any
+`.yaml` or `.yml` file in [core/cfgs/assistant.d](core/cfgs/assistant.d).
+Overrides are loaded alphabetically by filename and recursively merged, so a
+file can add or replace just a few entries. For example, an override may define
+`shell.apps.my_editor: "app:My Editor"` or add a site alias under `web.sites`.
+Only explicitly configured applications and exact safe commands are allowed;
+arbitrary shell commands remain disabled.
 
-Example commands include: "open VS Code," "launch Telegram," "open the site example.com," "search the internet for the weather," and "close Telegram." To confirm the termination of a process, say one of the phrases listed in `shell.confirm_words`; to cancel, say "cancel."
-
-Commands defined in `shell.safe_prefixes` are executed without a shell (`shell=False`), with an enforced timeout, and are recorded in an audit log. Arbitrary shell commands cannot be executed. Applications will only launch if their corresponding command is defined in `shell.apps`. To use actions via the main controller, create an `AssistentEngine` with `assistant_mode="actions"`. A separate `ActionEngine()` will automatically load the YAML configuration.
+The former `assistant.yaml` format is still supported as a compatibility
+overlay between built-in modules and `assistant.d` overrides. Explicit
+`ActionEngine(config_path=...)` continues to load the specified single file.
+Closing an allowlisted process is immediate by default; set
+`shell.confirm_process_close: true` to require one of `shell.confirm_words`.
+To use actions via the main controller, create an `AssistentEngine` with
+`assistant_mode="actions"`; a standalone `ActionEngine()` loads the modular
+configuration automatically.
 
 ## Configuration files
 
@@ -72,6 +90,7 @@ settings["language"] = "en"
 store.save("my_settings.json", settings)
 ```
 
-`main_cfg.json` stores startup preferences; `assistant.yaml` stores the
-ActionEngine allowlists and behavior settings. Invalid or non-mapping config
-files raise a clear `ValueError` rather than silently being ignored.
+`main_cfg.json` stores startup preferences; the ActionEngine configuration is
+composed by `AssistantConfigLoader` in [core/config_manager.py](core/config_manager.py).
+Invalid or non-mapping config files raise a clear `ValueError` rather than
+silently being ignored.

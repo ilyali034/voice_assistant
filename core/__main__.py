@@ -8,7 +8,12 @@ from .main_engine.engine import AssistentEngine
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the local voice assistant")
-    parser.add_argument("--mode", choices=("llm", "actions"), default="actions")
+    parser.add_argument(
+        "--mode",
+        choices=("hybrid", "llm", "actions"),
+        default="hybrid",
+        help="hybrid uses actions for known commands and Ollama for other questions",
+    )
     parser.add_argument("--lang", default="ru", help="Assistant and speech language")
     parser.add_argument("--model", default="llama3.2", help="Local Ollama model")
     parser.add_argument("--wake-word", default="ассистент")
@@ -28,6 +33,7 @@ async def _run(args: argparse.Namespace) -> None:
         print(
             f"Ассистент запущен в режиме {args.mode}. "
             f"Скажите «{args.wake_word}», затем произнесите команду. "
+            "Во время озвучивания нажмите Esc, чтобы прервать ответ. "
             "Для выхода нажмите Ctrl+C."
         )
         await assistant.start_assistent(wake_word=args.wake_word)
