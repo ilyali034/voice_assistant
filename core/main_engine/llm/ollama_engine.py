@@ -1,6 +1,8 @@
 
 import asyncio
 import json
+import shutil
+import subprocess
 
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -31,7 +33,25 @@ class OllamaResponseEngine:
         )
         self.search_engine = LangchainOllamaSearchEngine()
 
-    async def handle(self, request: str, web_search: bool) -> str:
+    def _pull_model(self) -> None:
+        if shutil.which("ollama") is None:
+            raise RuntimeError(
+                "Ollama command is not available in PATH. Install Ollama or add it to PATH."
+            )
+
+        result = subprocess.run(
+            ["ollama", "pull", self.model],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            details = (result.stderr or result.stdout or "").strip()
+            raise RuntimeError(
+                f"Could not pull Ollama model '{self.model}': {details or 'unknown error'}"
+            )
+
+    async def handle(self, request: str, web_search: bool = False) -> str:
         user_content = request
 
         if web_search:
@@ -67,9 +87,19 @@ class OllamaResponseEngine:
             response_data = await asyncio.to_thread(self._post, ollama_request)
         except HTTPError as error:
             details = error.read().decode("utf-8", errors="replace").strip()
-            raise RuntimeError(
-                f"Ollama returned HTTP {error.code}: {details or error.reason}"
-            ) from error
+            if error.code == 404 and "model" in details.lower() and "not found" in details.lower():
+                self._pull_model()
+                try:
+                    response_data = await asyncio.to_thread(self._post, ollama_request)
+                except HTTPError as retry_error:
+                    retry_details = retry_error.read().decode("utf-8", errors="replace").strip()
+                    raise RuntimeError(
+                        f"Ollama returned HTTP {retry_error.code}: {retry_details or retry_error.reason}"
+                    ) from retry_error
+            else:
+                raise RuntimeError(
+                    f"Ollama returned HTTP {error.code}: {details or error.reason}"
+                ) from error
         except (URLError, TimeoutError) as error:
             raise RuntimeError(
                 f"Could not connect to Ollama at {self.base_url}. "
@@ -81,7 +111,7 @@ class OllamaResponseEngine:
         if not isinstance(text, str) or not text.strip():
             raise RuntimeError("Ollama returned an empty or invalid chat response.")
         return text.strip()
-    
+
     def _post(self, request: Request) -> dict[str, Any]:
         with urlopen(request, timeout=self.timeout) as response:
             data = json.loads(response.read().decode("utf-8"))

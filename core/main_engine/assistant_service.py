@@ -3,7 +3,7 @@ from typing import Protocol
 
 
 class ResponseEngine(Protocol):
-    async def handle(self, request: str) -> str:
+    async def handle(self, request: str, web_search: bool = False) -> str:
         """Handle a user request and return a user-facing result."""
 
 

@@ -22,6 +22,7 @@ def _parse_args() -> argparse.Namespace:
 
 
 async def _run(args: argparse.Namespace) -> None:
+    print(f"Запуск ассистента в режиме {args.mode}...", flush=True)
     assistant = AssistentEngine(
         lang=args.lang,
         volume=args.volume,
