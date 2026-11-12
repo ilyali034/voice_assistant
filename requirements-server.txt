@@ -1,4 +1,9 @@
 fastapi
 uvicorn
+langchain_community
+ddgs
+sounddevice
+vosk
+pyttsx3
 PyYAML
 psutil

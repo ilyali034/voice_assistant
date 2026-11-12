@@ -3,7 +3,7 @@ from typing import Protocol
 
 
 class ResponseEngine(Protocol):
-    async def handle(self, request: str, web_search: bool = False) -> str:
+    async def handle(self, request: str, web_search: bool = True) -> str:
         """Handle a user request and return a user-facing result."""
 
 
@@ -35,13 +35,22 @@ class AssistantService:
             )
         self._assistant_mode = mode
 
-    async def handle_request(self, request: str) -> str:
+    async def handle_request(
+        self,
+        request: str,
+        history: list[dict[str, str]] | None = None,
+    ) -> str:
         """Normalize and dispatch text without recording audio or speaking."""
         request = request.strip()
         if not request:
             return ""
 
-        response = await self.response_engines[self._assistant_mode].handle(request)
+        engine = self.response_engines[self._assistant_mode]
+        contextual_handler = getattr(engine, "handle_with_history", None)
+        if history and callable(contextual_handler):
+            response = await contextual_handler(request, history)
+        else:
+            response = await engine.handle(request)
         if not isinstance(response, str):
             raise TypeError("The selected response engine must return a string")
         return response.strip()

@@ -130,15 +130,17 @@ class WakeUpModule:
                 return False
             except Exception as e:
                 print(f"\nОшибка при распознавании: {e}")
-                return False 
+                raise
 
 
 class VoiceTTSModule:
-    """Speak responses through an installed OS voice, interruptible with Esc."""
+    """Speak responses through an installed OS voice and support remote interruption."""
 
     def __init__(self, lang: str = "ru", volume: float = 1.0) -> None:
         self.lang = lang.casefold().replace("_", "-")
         self.volume = max(0.0, min(1.0, volume))
+        self._playback_lock = threading.Lock()
+        self._active_stop: threading.Event | None = None
 
     async def say(self, text: str, voice: str | None = None) -> None:
         if not text or not text.strip():
@@ -146,6 +148,8 @@ class VoiceTTSModule:
 
         stop_requested = threading.Event()
         playback_finished = threading.Event()
+        with self._playback_lock:
+            self._active_stop = stop_requested
         playback = asyncio.create_task(
             asyncio.to_thread(
                 self._say_sync,
@@ -163,9 +167,21 @@ class VoiceTTSModule:
         )
         try:
             await playback
+        except asyncio.CancelledError:
+            stop_requested.set()
+            raise
         finally:
             playback_finished.set()
-            await interrupt_listener
+            with self._playback_lock:
+                if self._active_stop is stop_requested:
+                    self._active_stop = None
+            await asyncio.gather(interrupt_listener, return_exceptions=True)
+
+    def stop(self) -> None:
+        """Request that the current speech playback stop as soon as possible."""
+        with self._playback_lock:
+            if self._active_stop is not None:
+                self._active_stop.set()
 
     @staticmethod
     def _wait_for_escape(

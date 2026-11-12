@@ -1,0 +1,385 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Assistent.ViewModels"
+        xmlns:models="using:Assistent.Models"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="1180" d:DesignHeight="760"
+        x:Class="Assistent.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        x:CompileBindings="False"
+        Title="Персональный ассистент"
+        Width="1180" Height="760" MinWidth="850" MinHeight="600"
+        WindowStartupLocation="CenterScreen"
+        Background="#0B0E14">
+
+    <Window.Styles>
+        <Style Selector="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="#E7EAF0" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.18" />
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.18" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button:pointerover">
+            <Setter Property="Background" Value="#202833" />
+        </Style>
+        <Style Selector="Button.accent">
+            <Setter Property="Background" Value="#B9F36A" />
+            <Setter Property="Foreground" Value="#10150D" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="Button.accent:pointerover">
+            <Setter Property="Background" Value="#C9FF7D" />
+        </Style>
+        <Style Selector="Button.icon-button">
+            <Setter Property="Foreground" Value="#99A2B1" />
+            <Setter Property="FontSize" Value="16" />
+        </Style>
+        <Style Selector="TextBox">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="#EDF0F5" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="SelectionBrush" Value="#536B3D" />
+            <Setter Property="CaretBrush" Value="#B9F36A" />
+        </Style>
+    </Window.Styles>
+
+    <Grid ColumnDefinitions="258,*,72">
+        <Border Grid.Column="0" Background="#11151D" BorderBrush="#202632" BorderThickness="0,0,1,0">
+            <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" Margin="18,22,14,16">
+                <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="11" Margin="5,0,0,28">
+                    <Border Width="36" Height="36" CornerRadius="12" Background="#B9F36A">
+                        <TextBlock Text="✦" Foreground="#18200E" FontSize="21" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <StackPanel VerticalAlignment="Center" Spacing="1">
+                        <TextBlock Text="АУРА" FontSize="15" FontWeight="Bold" LetterSpacing="2" Foreground="#F2F4F7" />
+                        <TextBlock Text="ЛИЧНЫЙ АССИСТЕНТ" FontSize="9" LetterSpacing="1.1" Foreground="#727D8D" />
+                    </StackPanel>
+                </StackPanel>
+
+                <Button Grid.Row="1" Classes="accent" Height="43" CornerRadius="12" HorizontalContentAlignment="Center"
+                        Command="{Binding NewChatCommand}" Margin="0,0,0,18">
+                    <StackPanel Orientation="Horizontal" Spacing="9">
+                        <TextBlock Text="＋" FontSize="19" VerticalAlignment="Center" />
+                        <TextBlock Text="Новый диалог" FontSize="13" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+
+                <Border Grid.Row="2" Background="#191F29" CornerRadius="10" Padding="10,0" Height="38" Margin="0,0,0,22">
+                    <Grid ColumnDefinitions="Auto,*" VerticalAlignment="Center">
+                        <TextBlock Text="⌕" FontSize="21" Foreground="#818B9B" Margin="0,0,8,2" />
+                        <TextBox Grid.Column="1" Text="{Binding SearchText}" PlaceholderText="Поиск диалогов" FontSize="12" VerticalContentAlignment="Center" />
+                    </Grid>
+                </Border>
+
+                <StackPanel Grid.Row="3" Spacing="8">
+                    <TextBlock Text="ИСТОРИЯ" FontSize="10" FontWeight="SemiBold" LetterSpacing="1.2" Foreground="#778191" Margin="7,0,0,5" />
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding FilteredChats}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid ColumnDefinitions="*,34" Margin="0,1">
+                                        <Button Command="{Binding $parent[Window].DataContext.SelectChatCommand}" CommandParameter="{Binding}"
+                                                HorizontalContentAlignment="Stretch" Padding="0" CornerRadius="10">
+                                            <Border Padding="10,10" CornerRadius="10">
+                                                <Grid ColumnDefinitions="30,*" RowDefinitions="Auto,Auto">
+                                                    <Border Grid.RowSpan="2" Width="28" Height="28" CornerRadius="9" Background="#222C38" VerticalAlignment="Top">
+                                                        <TextBlock Text="◌" Foreground="#B9F36A" FontSize="17" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                    </Border>
+                                                    <TextBlock Grid.Column="1" Text="{Binding Title}" FontSize="12" FontWeight="Medium" Foreground="#E5E8ED" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Grid.Column="1" Grid.Row="1" Text="{Binding Preview}" FontSize="10" Foreground="#828C9B" TextTrimming="CharacterEllipsis" Margin="0,4,0,0" />
+                                                </Grid>
+                                            </Border>
+                                        </Button>
+                                        <Button Grid.Column="1" Command="{Binding $parent[Window].DataContext.DeleteChatCommand}" CommandParameter="{Binding}"
+                                                Width="30" Height="30" CornerRadius="9" VerticalAlignment="Center" HorizontalAlignment="Center"
+                                                Foreground="#778191" ToolTip.Tip="Удалить диалог">
+                                            <TextBlock Text="×" FontSize="19" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Button>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </StackPanel>
+
+                <Border Grid.Row="4" BorderBrush="#252C37" BorderThickness="0,1,0,0" Padding="0,14,0,0" Margin="0,14,0,0">
+                    <Grid ColumnDefinitions="36,*,Auto">
+                        <Border Width="34" Height="34" CornerRadius="12" Background="#293342">
+                            <TextBlock Text="И" FontSize="13" FontWeight="SemiBold" Foreground="#DDE3EA" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0,0,0" Spacing="2">
+                            <TextBlock Text="Backend API" FontSize="11" FontWeight="SemiBold" Foreground="#DDE2E9" />
+                            <TextBlock Text="{Binding ConnectionStatus}" FontSize="10" Foreground="#AEB8C6" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                        <Button Grid.Column="2" Classes="icon-button" Content="⚙" Width="36" Height="36" CornerRadius="10"
+                                Command="{Binding ToggleSettingsCommand}" ToolTip.Tip="Настройки подключения" />
+                    </Grid>
+                </Border>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Column="1" IsVisible="{Binding IsVoicePageOpen}" RowDefinitions="68,*,Auto">
+            <Border Grid.Row="0" Background="#0D1118" BorderBrush="#202632" BorderThickness="0,0,0,1" Padding="28,0">
+                <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                    <StackPanel Spacing="3">
+                        <TextBlock Text="ГОЛОСОВОЙ ИНТЕРФЕЙС" FontSize="10" FontWeight="Bold" LetterSpacing="1.5" Foreground="#B9F36A" />
+                        <TextBlock Text="Аура всегда на связи" FontSize="13" FontWeight="SemiBold" Foreground="#EDF0F5" />
+                    </StackPanel>
+                    <Border Grid.Column="1" Background="#171E27" CornerRadius="10" Padding="11,8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Ellipse Width="7" Height="7" Fill="#B9F36A" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding ConnectionStatus}" FontSize="10" Foreground="#C2CAD4" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="1" RowDefinitions="*,Auto" Margin="24,12,24,18">
+                <StackPanel Grid.Row="0" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="8">
+                    <Border Background="#171D23" BorderBrush="#303C2A" BorderThickness="1" CornerRadius="20" Padding="12,6" HorizontalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Spacing="7">
+                            <Ellipse Width="6" Height="6" Fill="#B9F36A" VerticalAlignment="Center" />
+                            <TextBlock Text="ЛИЧНЫЙ AI-АССИСТЕНТ" FontSize="9" FontWeight="Bold" LetterSpacing="1.1" Foreground="#C4D0B4" />
+                        </StackPanel>
+                    </Border>
+                    <TextBlock Text="Чем могу помочь?" FontSize="29" FontWeight="SemiBold" Foreground="#F3F4F6" HorizontalAlignment="Center" Margin="0,5,0,0" />
+                    <TextBlock Text="Нажмите на микрофон и говорите естественно — я распознаю речь и отвечу голосом." FontSize="12" Foreground="#8792A2" TextWrapping="Wrap" MaxWidth="470" TextAlignment="Center" HorizontalAlignment="Center" />
+
+                    <Grid Width="350" Height="320" Margin="0,4,0,0">
+                        <Ellipse x:Name="GlowRing" Width="258" Height="258" Fill="#12EF9B3D" HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="50%,50%" />
+                        <Ellipse x:Name="PulseRingB" Width="230" Height="230" Stroke="#45F1A344" StrokeThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="50%,50%" />
+                        <Ellipse x:Name="PulseRingA" Width="186" Height="186" Stroke="#78F7B54C" StrokeThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="50%,50%" />
+                        <Ellipse x:Name="OrbitLine" Width="300" Height="168" Stroke="#C8D6D0D0" StrokeThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="50%,50%" />
+                        <Ellipse Width="246" Height="134" Stroke="#66D99542" StrokeThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <Border x:Name="VoiceOrb" Width="152" Height="152" CornerRadius="76" Background="#B96A24" BorderBrush="#FFD584" BorderThickness="2" HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="50%,50%">
+                            <Grid>
+                                <Ellipse Width="126" Height="126" Fill="#D6812C" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <Ellipse Width="96" Height="96" Fill="#E99C3B" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <Ellipse Width="56" Height="56" Fill="#FFCA64" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <TextBlock Text="✦" FontSize="25" Foreground="#FFF0C8" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                        <Border Width="12" Height="12" CornerRadius="6" Background="#FFD47B" BorderBrush="#FFF0C8" BorderThickness="1" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,40,0" />
+                        <Border Width="8" Height="8" CornerRadius="4" Background="#B9F36A" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="45,0,0,0" />
+                    </Grid>
+
+                    <TextBlock Text="{Binding VoiceStatus}" FontSize="12" Foreground="#D7DCCF" HorizontalAlignment="Center" TextAlignment="Center" MaxWidth="500" TextWrapping="Wrap" Margin="0,0,0,6" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="12">
+                        <Button IsVisible="{Binding CanStartVoice}" Command="{Binding StartVoiceCommand}"
+                                Width="66" Height="66" CornerRadius="33" Background="#B9F36A" Foreground="#11170C" ToolTip.Tip="Начать голосовой ввод">
+                            <TextBlock Text="🎙" FontSize="25" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Button>
+                        <Button IsVisible="{Binding CanInterruptVoice}" Command="{Binding InterruptVoiceCommand}"
+                                Width="66" Height="66" CornerRadius="33" Background="#E36D5B" Foreground="White" ToolTip.Tip="Прервать ответ или прослушивание">
+                            <TextBlock Text="■" FontSize="21" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Button>
+                    </StackPanel>
+                    <Button IsVisible="{Binding IsWakeWordOff}" Command="{Binding StartWakeWordCommand}" IsEnabled="{Binding CanStartVoice}"
+                            Background="#171E27" BorderBrush="#303C2A" BorderThickness="1" CornerRadius="12" Padding="18,10" HorizontalAlignment="Center" Margin="0,8,0,0">
+                        <StackPanel Orientation="Horizontal" Spacing="9">
+                            <TextBlock Text="◉" FontSize="16" Foreground="#B9F36A" VerticalAlignment="Center" />
+                            <TextBlock Text="Включить пробуждение по слову" FontSize="11" Foreground="#DDE5D5" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button IsVisible="{Binding IsWakeWordOn}" Command="{Binding StopWakeWordCommand}"
+                            Background="#25211C" BorderBrush="#58432D" BorderThickness="1" CornerRadius="12" Padding="18,10" HorizontalAlignment="Center" Margin="0,8,0,0">
+                        <StackPanel Orientation="Horizontal" Spacing="9">
+                            <Ellipse Width="7" Height="7" Fill="#B9F36A" VerticalAlignment="Center" />
+                            <TextBlock Text="Отключить пробуждение" FontSize="11" Foreground="#E5D9C6" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <TextBlock Text="VOSK · СИСТЕМНЫЙ ГОЛОС · РУССКИЙ ЯЗЫК" FontSize="9" LetterSpacing="1" Foreground="#657080" HorizontalAlignment="Center" Margin="0,3,0,0" />
+                </StackPanel>
+            </Grid>
+
+            <TextBlock Grid.Row="2" Text="Голосовой ввод и озвучивание выполняются на устройстве с запущенным API." FontSize="9" Foreground="#626D7B" HorizontalAlignment="Center" Margin="10,0,10,3" />
+        </Grid>
+
+        <Grid Grid.Column="1" IsVisible="{Binding IsChatOpen}" RowDefinitions="68,*,Auto">
+            <Border Grid.Row="0" Background="#0D1118" BorderBrush="#202632" BorderThickness="0,0,0,1" Padding="28,0">
+                <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="{Binding SelectedChat.Title}" FontSize="14" FontWeight="SemiBold" Foreground="#F0F2F6" />
+                        <TextBlock Text="Ответы поступают от настроенного backend" FontSize="10" Foreground="#8C96A5" />
+                    </StackPanel>
+                    <Border Grid.Column="1" Background="#171E27" CornerRadius="8" Padding="10,7">
+                        <StackPanel Orientation="Horizontal" Spacing="7">
+                            <Ellipse Width="6" Height="6" Fill="#9AA5B4" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding ConnectionStatus}" FontSize="10" Foreground="#C2CAD4" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel MaxWidth="780" HorizontalAlignment="Center" Spacing="20" Margin="28,30,28,30">
+                    <StackPanel IsVisible="{Binding IsEmptyChat}" HorizontalAlignment="Center" Spacing="12" Margin="0,90,0,55">
+                        <Border Width="58" Height="58" CornerRadius="20" Background="#B9F36A" HorizontalAlignment="Center">
+                            <TextBlock Text="✦" FontSize="30" Foreground="#18200E" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="С чего начнём?" FontSize="22" FontWeight="SemiBold" Foreground="#F0F2F6" HorizontalAlignment="Center" />
+                        <TextBlock Text="Напиши сообщение — ассистент ответит через подключённый backend." FontSize="12" Foreground="#8C96A5" TextWrapping="Wrap" MaxWidth="390" TextAlignment="Center" />
+                    </StackPanel>
+                    <ItemsControl ItemsSource="{Binding SelectedChat.Messages}">
+                        <ItemsControl.DataTemplates>
+                            <DataTemplate DataType="models:AssistantChatMessage">
+                                <Grid ColumnDefinitions="34,*" Margin="0,4,38,4">
+                                    <Border Width="30" Height="30" CornerRadius="10" Background="#B9F36A" VerticalAlignment="Top">
+                                        <TextBlock Text="✦" FontSize="16" Foreground="#18200E" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                    <StackPanel Grid.Column="1" Spacing="6">
+                                        <TextBlock Text="АССИСТЕНТ" FontSize="9" FontWeight="Bold" LetterSpacing="1.1" Foreground="#A6B18F" />
+                                        <Border Background="#171D26" BorderBrush="#242C38" BorderThickness="1" CornerRadius="4,14,14,14" Padding="15,12" HorizontalAlignment="Left" MaxWidth="590">
+                                            <StackPanel Spacing="8">
+                                                <TextBlock Text="{Binding Text}" TextWrapping="Wrap" FontSize="13" LineHeight="20" Foreground="#E2E6EC" />
+                                                <TextBlock Text="{Binding Time}" FontSize="9" Foreground="#707B8A" HorizontalAlignment="Right" />
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                            <DataTemplate DataType="models:UserChatMessage">
+                                <Grid ColumnDefinitions="*,Auto" Margin="38,4,0,4">
+                                    <StackPanel Grid.Column="1" Spacing="6" HorizontalAlignment="Right">
+                                        <TextBlock Text="ТЫ" FontSize="9" FontWeight="Bold" LetterSpacing="1.1" Foreground="#8C96A5" HorizontalAlignment="Right" />
+                                        <Border Background="#273444" BorderBrush="#344354" BorderThickness="1" CornerRadius="14,4,14,14" Padding="15,12" MaxWidth="590">
+                                            <StackPanel Spacing="8">
+                                                <TextBlock Text="{Binding Text}" TextWrapping="Wrap" FontSize="13" LineHeight="20" Foreground="#EDF1F6" />
+                                                <TextBlock Text="{Binding Time}" FontSize="9" Foreground="#9AA5B4" HorizontalAlignment="Right" />
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                            <DataTemplate DataType="models:ErrorChatMessage">
+                                <Border Background="#27191D" BorderBrush="#523037" BorderThickness="1" CornerRadius="10" Padding="13,10" Margin="42,4,38,4">
+                                    <StackPanel Spacing="5">
+                                        <TextBlock Text="НЕ УДАЛОСЬ ВЫПОЛНИТЬ ЗАПРОС" FontSize="9" FontWeight="Bold" Foreground="#F19A9A" />
+                                        <TextBlock Text="{Binding Text}" TextWrapping="Wrap" FontSize="12" Foreground="#F2CACA" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.DataTemplates>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
+
+            <StackPanel Grid.Row="2" MaxWidth="780" HorizontalAlignment="Center" Margin="28,10,28,22" Spacing="9">
+                <ProgressBar Height="2" IsIndeterminate="True" IsVisible="{Binding IsBusy}" Foreground="#B9F36A" Background="#202833" />
+                <Border Background="#151B24" BorderBrush="#2A3340" BorderThickness="1" CornerRadius="16" Padding="14,10">
+                    <Grid ColumnDefinitions="*,Auto" MinHeight="54">
+                        <TextBox Text="{Binding DraftMessage}" PlaceholderText="Напиши сообщение…" AcceptsReturn="True" TextWrapping="Wrap"
+                                 FontSize="13" MinHeight="44" MaxHeight="110" VerticalContentAlignment="Center"
+                                 KeyDown="MessageInput_KeyDown" IsEnabled="{Binding IsNotBusy}" />
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+                            <Button Content="Отмена" IsVisible="{Binding IsBusy}" Command="{Binding CancelRequestCommand}"
+                                    Padding="12,8" CornerRadius="10" FontSize="11" />
+                            <Button Classes="accent" Content="↑" FontSize="20" Width="38" Height="38" CornerRadius="12"
+                                    Command="{Binding SendMessageCommand}" IsEnabled="{Binding CanSend}" ToolTip.Tip="Отправить" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+                <TextBlock Text="Сообщения и настройки хранятся локально на этом устройстве." FontSize="9" Foreground="#697483" HorizontalAlignment="Center" />
+            </StackPanel>
+        </Grid>
+
+        <Grid Grid.Column="1" IsVisible="{Binding IsSettingsOpen}" RowDefinitions="68,*">
+            <Border Grid.Row="0" Background="#0D1118" BorderBrush="#202632" BorderThickness="0,0,0,1" Padding="28,0">
+                <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                    <StackPanel Spacing="3">
+                        <TextBlock Text="Подключение" FontSize="15" FontWeight="SemiBold" Foreground="#F0F2F6" />
+                        <TextBlock Text="Настрой адрес существующего Python API" FontSize="10" Foreground="#8993A2" />
+                    </StackPanel>
+                    <Button Grid.Column="1" Content="Закрыть" Padding="14,9" CornerRadius="10" Command="{Binding ToggleSettingsCommand}" />
+                </Grid>
+            </Border>
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                <StackPanel MaxWidth="680" HorizontalAlignment="Left" Margin="40,34,40,40" Spacing="22">
+                    <StackPanel Spacing="7">
+                        <TextBlock Text="ASSISTANT BACKEND" FontSize="10" FontWeight="Bold" LetterSpacing="1.2" Foreground="#AAB58F" />
+                        <TextBlock Text="Клиент подключается к API, определённому в core/api/server.py." FontSize="12" Foreground="#8F9AAA" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <Border Background="#141A23" BorderBrush="#252D38" BorderThickness="1" CornerRadius="14" Padding="18">
+                        <StackPanel Spacing="17">
+                            <StackPanel Spacing="7">
+                                <TextBlock Text="Адрес API" FontSize="11" FontWeight="SemiBold" Foreground="#DDE2E9" />
+                                <TextBox Text="{Binding BackendUrl}" Background="#1B222D" Padding="12,10" CornerRadius="9" PlaceholderText="http://127.0.0.1:8765" />
+                                <TextBlock Text="Для удалённого сервера требуется HTTPS. HTTP разрешён только на localhost." FontSize="10" Foreground="#778292" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel Spacing="7">
+                                <TextBlock Text="Bearer API-ключ" FontSize="11" FontWeight="SemiBold" Foreground="#DDE2E9" />
+                                <TextBox Text="{Binding ApiKey}" PasswordChar="●" Background="#1B222D" Padding="12,10" CornerRadius="9" PlaceholderText="Ключ из переменной ASSISTANT_API_KEY" />
+                                <TextBlock Text="Ключ шифруется Windows DPAPI перед записью в профиль пользователя." FontSize="10" Foreground="#778292" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel Spacing="7">
+                                <CheckBox IsChecked="{Binding AutoStartBackend}" Content="Запускать Ollama и бэкенд вместе с приложением" Foreground="#DDE2E9" />
+                                <TextBlock Text="Работает только для адреса на localhost. Ключ создаётся автоматически, если поле пустое." FontSize="10" Foreground="#778292" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel Spacing="7">
+                                <TextBlock Text="Модель Ollama" FontSize="11" FontWeight="SemiBold" Foreground="#DDE2E9" />
+                                <TextBox Text="{Binding Model}" Background="#1B222D" Padding="12,10" CornerRadius="9" PlaceholderText="llama3.2" />
+                                <TextBlock Text="Если модели нет, она скачается при первом запуске." FontSize="10" Foreground="#778292" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel Spacing="7">
+                                <TextBlock Text="Wake word — слово пробуждения" FontSize="11" FontWeight="SemiBold" Foreground="#DDE2E9" />
+                                <TextBox Text="{Binding WakeWord}" Background="#1B222D" Padding="12,10" CornerRadius="9" PlaceholderText="ассистент" />
+                                <TextBlock Text="Сохраните настройки, затем включите ожидание слова на главном экране. По умолчанию: «ассистент»." FontSize="10" Foreground="#778292" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel Spacing="7">
+                                <TextBlock Text="Папка проекта (необязательно)" FontSize="11" FontWeight="SemiBold" Foreground="#DDE2E9" />
+                                <TextBox Text="{Binding ProjectRoot}" Background="#1B222D" Padding="12,10" CornerRadius="9" PlaceholderText="Автопоиск: папка с core\api\server.py" />
+                            </StackPanel>
+                            <StackPanel Spacing="7">
+                                <TextBlock Text="Путь к python.exe (необязательно)" FontSize="11" FontWeight="SemiBold" Foreground="#DDE2E9" />
+                                <TextBox Text="{Binding PythonPath}" Background="#1B222D" Padding="12,10" CornerRadius="9" PlaceholderText="Автопоиск: voice_venv\Scripts\python.exe, затем python из PATH" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <Button Classes="accent" Content="Сохранить" Padding="16,10" CornerRadius="9" Command="{Binding SaveSettingsCommand}" />
+                                <Button Content="Проверить сервер" Padding="16,10" CornerRadius="9" Command="{Binding TestConnectionCommand}" IsEnabled="{Binding IsNotBusy}" />
+                                <Button Content="Запустить" Padding="16,10" CornerRadius="9" Command="{Binding StartBackendCommand}" />
+                                <Button Content="Остановить" Padding="16,10" CornerRadius="9" Command="{Binding StopBackendCommand}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                    <Border Background="#172019" BorderBrush="#33412B" BorderThickness="1" CornerRadius="12" Padding="14">
+                        <StackPanel Spacing="7">
+                            <TextBlock Text="СТАТУС" FontSize="9" FontWeight="Bold" LetterSpacing="1" Foreground="#B9F36A" />
+                            <TextBlock Text="{Binding ConnectionStatus}" FontSize="12" Foreground="#DDE5D5" />
+                            <TextBlock Text="{Binding ErrorMessage}" FontSize="11" Foreground="#F19A9A" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+                    <TextBlock Text="API health проверяет доступность процесса. Корректность API-ключа подтвердится при отправке первого сообщения." FontSize="10" Foreground="#8993A2" TextWrapping="Wrap" />
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+
+        <Border Grid.Column="2" Background="#11151D" BorderBrush="#202632" BorderThickness="1,0,0,0">
+            <Grid RowDefinitions="Auto,*,Auto" Margin="10,18">
+                <Border Width="42" Height="42" CornerRadius="15" Background="#B9F36A" HorizontalAlignment="Center">
+                    <TextBlock Text="✦" Foreground="#18200E" FontSize="23" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <StackPanel Grid.Row="1" VerticalAlignment="Center" Spacing="10">
+                    <Button Command="{Binding ShowVoiceCommand}" Width="48" Height="48" CornerRadius="15" HorizontalContentAlignment="Center" ToolTip.Tip="Голосовой помощник">
+                        <TextBlock Text="◉" FontSize="21" Foreground="#B9F36A" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Button>
+                    <Button Command="{Binding ShowChatCommand}" Width="48" Height="48" CornerRadius="15" HorizontalContentAlignment="Center" ToolTip.Tip="Чаты">
+                        <TextBlock Text="▤" FontSize="20" Foreground="#AAB4C2" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Button>
+                    <Button Command="{Binding ShowSettingsCommand}" Width="48" Height="48" CornerRadius="15" HorizontalContentAlignment="Center" ToolTip.Tip="Настройки">
+                        <TextBlock Text="⚙" FontSize="20" Foreground="#AAB4C2" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Button>
+                </StackPanel>
+                <Button Grid.Row="2" Width="48" Height="48" CornerRadius="15" HorizontalContentAlignment="Center" ToolTip.Tip="Состояние сервера">
+                    <TextBlock Text="●" FontSize="16" Foreground="#B9F36A" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Button>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
