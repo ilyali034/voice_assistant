@@ -53,19 +53,26 @@ class OllamaResponseEngine:
 
     async def handle(self, request: str, web_search: bool = True) -> str:
         user_content = request
-
         if web_search:
             eth_context = await self.search_engine.standart_search(request=request)
-            user_content = (
-                f"<context>\n{eth_context}\n</context>\n\n"
-                f"Используя приведенный выше контекст из интернета, "
-                f"ответь на вопрос: {request}"
-            )
+            print(f"[DEBUG] Длина найденного контекста: {len(eth_context)} символов")
+            if eth_context:
+                user_content = (
+                    f"Ниже приведены актуальные результаты поиска из интернета.\n"
+                    f"<context>\n{eth_context}\n</context>\n\n"
+                    f"Опираясь на этот контекст, ответь на вопрос пользователя: {request}"
+                )
+            else:
+                user_content = f"Ответь на вопрос без использования веб-контекста: {request}"
 
         body = json.dumps(
             {
                 "model": self.model,
                 "stream": False,
+                "options": {
+                    "num_ctx": 8192,
+                    "temperature": 0.3,
+                },
                 "messages": [
                     {
                         "role": "system",
