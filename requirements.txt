@@ -17,3 +17,6 @@ aiosqlite
 langchain_community
 sentence_transformers
 selenium
+ddgs
+requests
+beautifulsoup4

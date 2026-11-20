@@ -3,8 +3,6 @@ import subprocess
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
-from ddgs.exceptions import TimeoutException
-
 from core.main_engine.engine import AssistentEngine
 from core.main_engine.llm.ollama_engine import OllamaResponseEngine
 from core.main_engine.llm.search_tools.search_engine import LangchainOllamaSearchEngine
@@ -51,12 +49,23 @@ class OllamaLifecycleTests(unittest.TestCase):
 
     def test_search_timeout_returns_empty_context_without_crashing(self):
         engine = LangchainOllamaSearchEngine()
-        engine.search_tool.ainvoke = AsyncMock(side_effect=TimeoutException("timed out"))
 
-        result = asyncio.run(engine.standart_search("какая погода в липецке"))
+        with patch(
+            "core.main_engine.llm.search_tools.search_engine.DDGS",
+            side_effect=TimeoutError("timed out"),
+        ):
+            result = asyncio.run(engine.standart_search("какая погода в липецке"))
 
         self.assertIsInstance(result, str)
         self.assertEqual(result, "")
+
+    def test_request_language_is_detected_for_search_locale(self):
+        engine = object.__new__(OllamaResponseEngine)
+        engine.lang = "ru"
+
+        self.assertEqual(engine._detect_request_language("Какая погода сегодня?"), "ru")
+        self.assertEqual(engine._detect_request_language("What is the weather today?"), "en")
+        self.assertEqual(engine._detect_request_language("Який сьогодні стан погоди?"), "uk")
 
 
 if __name__ == "__main__":

@@ -1,7 +1,6 @@
-"""Google search via Selenium -> text context for an LLM.
+"""Web search and reranking for the Ollama response engine.
 
-Drop-in for core/main_engine/llm/search_tools/search_engine.py.
-Keeps the interface ollama_engine.py already uses:
+The public interface remains:
     LangchainOllamaSearchEngine().standart_search(request=...) -> str
 """
 from __future__ import annotations
@@ -10,16 +9,10 @@ import asyncio
 import re
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from urllib.parse import quote_plus, urlparse
 
 import requests
 from bs4 import BeautifulSoup
-from selenium import webdriver
-from selenium.common.exceptions import TimeoutException, WebDriverException
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
+from ddgs import DDGS
 
 try:
     from .reranker import Chunk, Embedder, SentenceTransformerEmbedder, chunk_text, rerank
@@ -34,7 +27,7 @@ SNIPPET_SELECTOR = "div[data-sncf], div.VwiC3b, span.VwiC3b"
 
 
 class SearchBlockedError(RuntimeError):
-    """Google served captcha / 'unusual traffic' page."""
+    """Reserved for provider-specific blocking errors."""
 
 
 @dataclass
@@ -57,10 +50,10 @@ class LangchainOllamaSearchEngine:
         max_context_chars: int = 6000,
         # --- semantic rerank ---
         rerank: bool = True,
-        candidates: int = 8,        
-        top_chunks: int = 5,       
-        chunks_per_url: int = 2,
-        min_score: float = 0.0,    
+        candidates: int = 10,
+        top_chunks: int = 4,
+        chunks_per_url: int = 1,
+        min_score: float = 0.24,
         embedder: Embedder | None = None,
         embed_model: str = "intfloat/multilingual-e5-small",
     ) -> None:
@@ -80,57 +73,106 @@ class LangchainOllamaSearchEngine:
 
     # ---------- public ----------
 
+    def _build_search_query(self, request: str) -> str:
+        """Convert a natural-language question into a concise search query."""
+        text = re.sub(r"\s+", " ", request).strip(" ?!.,;:")
+        if not text:
+            return request
+
+        # Stop phrases are not useful in search and often dilute the ranking.
+        stop_phrases = (
+            r"^\s*(what is|what are|what's|who is|who are|tell me|please)",
+            r"^\s*(что такое|что есть|кто такой|кто такая|скажи мне|пожалуйста)",
+            r"^\s*(що таке|хто такий|хто така|розкажи мені|будь ласка)",
+        )
+        for pattern in stop_phrases:
+            text = re.sub(pattern, "", text, count=1, flags=re.IGNORECASE).strip()
+
+        return text
+
     async def standart_search(self, request: str, **kwargs) -> str:
-        """Return formatted context string. Empty string on any failure."""
+        """Return a concise, reranked context string. Empty string on failure."""
+        search_query = self._build_search_query(request)
         try:
-            results = await asyncio.to_thread(self.search, request)
+            results = await asyncio.to_thread(self.search, search_query)
         except SearchBlockedError:
             print("[search] Google blocked request (captcha). Try later / other IP.")
             return ""
-        except Exception as error: 
+        except Exception as error:
             print(f"[search] failed: {error!r}")
             return ""
 
         if self.use_rerank and results:
             try:
                 return await asyncio.to_thread(self.rerank_context, request, results)
-            except Exception as error:  # noqa: BLE001  (model download/load error...)
+            except Exception as error:  # noqa: BLE001
                 print(f"[search] rerank failed, plain order used: {error!r}")
         return self.format_context(results[: self.max_results])
 
     def search(self, query: str) -> list[SearchResult]:
-        """Blocking. Run in a thread from async code."""
+        """Run a bounded metasearch request in a worker thread."""
         limit = self.candidates if self.use_rerank else self.max_results
-        driver = self._make_driver()
+        region = {
+            "ru": "ru-ru", "uk": "ua-uk", "be": "by-be", "en": "us-en",
+            "de": "de-de", "fr": "fr-fr", "es": "es-es", "it": "it-it",
+            "pt": "pt-pt", "pl": "pl-pl", "tr": "tr-tr", "ar": "sa-ar",
+            "zh": "cn-zh", "ja": "jp-ja", "ko": "kr-ko",
+        }.get(self.lang, "us-en")
+
         try:
-            url = (
-                "https://www.google.com/search"
-                f"?q={quote_plus(query)}&hl={self.lang}&num={limit + 5}"
+            fresh_markers = (
+                "сегодня", "сейчас", "последн", "актуаль",
+                "today", "now", "latest", "current", "recent", "this week",
             )
-            driver.get(url)
-            self._handle_consent(driver)
-            if "/sorry/" in driver.current_url:
-                raise SearchBlockedError(driver.current_url)
+            timelimit_options = ["d", None] if any(
+                marker in query.casefold() for marker in fresh_markers
+            ) else [None]
 
-            try:
-                WebDriverWait(driver, self.timeout).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, "#search, #rso"))
-                )
-            except TimeoutException:
-                if "/sorry/" in driver.current_url or "captcha" in driver.page_source.lower():
-                    raise SearchBlockedError(driver.current_url) from None
+            raw_results: list[dict[str, str]] = []
+            last_error: Exception | None = None
+            for timelimit in timelimit_options:
+                try:
+                    with DDGS(timeout=int(self.timeout), verify=True) as ddgs:
+                        raw_results = ddgs.text(
+                            query,
+                            region=region,
+                            safesearch="moderate",
+                            timelimit=timelimit,
+                            max_results=limit,
+                            backend="auto",
+                        )
+                    if raw_results:
+                        break
+                except Exception as error:
+                    last_error = error
+
+            if not raw_results:
+                if last_error:
+                    print(f"[search] DDGS failed: {last_error!r}")
+                else:
+                    print("[search] DDGS returned no results")
                 return []
+        except Exception as error:
+            print(f"[search] DDGS failed: {error!r}")
+            return []
 
-            results = self._parse(driver, limit)
-        finally:
-            driver.quit()
+        parsed_results: list[SearchResult] = []
+        seen_urls: set[str] = set()
+        for item in raw_results:
+            title = str(item.get("title", "")).strip()
+            url = str(item.get("href") or item.get("url", "")).strip()
+            snippet = str(item.get("body") or item.get("snippet", "")).strip()
+            if not title or not url.startswith("http") or url in seen_urls:
+                continue
+            seen_urls.add(url)
+            parsed_results.append(SearchResult(title=title, url=url, snippet=snippet))
 
         if self.fetch_pages or self.use_rerank:
             with ThreadPoolExecutor(max_workers=6) as pool:
-                texts = list(pool.map(self._fetch_page_text, [r.url for r in results]))
-            for item, text in zip(results, texts):
+                texts = list(pool.map(self._fetch_page_text, [r.url for r in parsed_results]))
+            for item, text in zip(parsed_results, texts):
                 item.page_text = text
-        return results
+        return parsed_results
 
     def rerank_context(self, query: str, results: list[SearchResult]) -> str:
         """Chunk snippets + pages, keep chunks most similar to query."""
@@ -141,7 +183,7 @@ class LangchainOllamaSearchEngine:
             for piece in chunk_text(r.page_text):
                 chunks.append(Chunk(piece, r.url, r.title))
         if not chunks:
-            return self.format_context(results[: self.max_results])
+            return ""
 
         best = rerank(
             query, chunks, self.embedder,
@@ -173,65 +215,6 @@ class LangchainOllamaSearchEngine:
             parts.append(block)
             total += len(block) + 2
         return "\n\n".join(parts)
-
-    # ---------- selenium ----------
-
-    def _make_driver(self) -> webdriver.Chrome:
-        opts = Options()
-        if self.headless:
-            opts.add_argument("--headless=new")
-        opts.add_argument("--no-sandbox")
-        opts.add_argument("--disable-gpu")
-        opts.add_argument("--window-size=1280,900")
-        opts.add_argument(f"--lang={self.lang}")
-        opts.add_argument(f"--user-agent={USER_AGENT}")
-        opts.add_argument("--disable-blink-features=AutomationControlled")
-        opts.add_experimental_option("excludeSwitches", ["enable-automation"])
-        opts.page_load_strategy = "eager"
-        driver = webdriver.Chrome(options=opts)
-        driver.set_page_load_timeout(self.timeout * 2)
-        return driver
-
-    @staticmethod
-    def _handle_consent(driver: webdriver.Chrome) -> None:
-        """Click cookie-consent button (EU etc.) if shown."""
-        for button_id in ("L2AGLb", "W0wltc"):  
-            try:
-                buttons = driver.find_elements(By.ID, button_id)
-                if buttons:
-                    buttons[0].click()
-                    return
-            except WebDriverException:
-                pass
-
-    def _parse(self, driver: webdriver.Chrome, limit: int) -> list[SearchResult]:
-        results: list[SearchResult] = []
-        seen: set[str] = set()
-
-        for h3 in driver.find_elements(By.CSS_SELECTOR, "#search a h3, #rso a h3"):
-            if len(results) >= limit:
-                break
-            try:
-                title = h3.text.strip()
-                link = h3.find_element(By.XPATH, "./ancestor::a[1]").get_attribute("href") or ""
-                host = urlparse(link).netloc
-                if not title or not link.startswith("http") or "google." in host or link in seen:
-                    continue
-
-                snippet = ""
-                node = h3
-                for _ in range(6): 
-                    node = node.find_element(By.XPATH, "..")
-                    found = node.find_elements(By.CSS_SELECTOR, SNIPPET_SELECTOR)
-                    if found:
-                        snippet = found[0].text.strip()
-                        break
-            except WebDriverException: 
-                continue
-
-            seen.add(link)
-            results.append(SearchResult(title=title, url=link, snippet=snippet))
-        return results
 
     # ---------- optional page fetch ----------
 

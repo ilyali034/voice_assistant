@@ -2,3 +2,7 @@ fastapi
 uvicorn
 PyYAML
 psutil
+ddgs
+requests
+beautifulsoup4
+sentence-transformers
