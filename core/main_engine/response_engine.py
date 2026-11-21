@@ -87,7 +87,6 @@ class ActionEngine:
     _default_config_path = CONFIG_DIR / "assistant.yaml"
     _search_templates = {
         "google": "https://www.google.com/search?q={query}",
-        "yandex": "https://yandex.com/search/?text={query}",
         "duckduckgo": "https://duckduckgo.com/?q={query}",
         "bing": "https://www.bing.com/search?q={query}",
     }
