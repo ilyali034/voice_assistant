@@ -6,7 +6,7 @@ import uvicorn
 from fastapi import FastAPI
 
 from ..main_engine.assistant_service import AssistantService
-from ..main_engine.response_engine import OllamaResponseEngine
+from ..main_engine.llm.ollama_engine import OllamaResponseEngine
 from .app import create_app
 
 
